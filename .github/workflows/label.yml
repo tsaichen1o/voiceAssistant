@@ -1,0 +1,18 @@
+# 🏷️ Automatically label pull requests based on changed files
+
+name: 🏷️ PR Label Wizard
+
+on: [pull_request_target]
+
+jobs:
+  magic-labeler:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: 🔍 Summoning the label spirits...
+        uses: actions/labeler@v4
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
