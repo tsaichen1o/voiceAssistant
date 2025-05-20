@@ -1,0 +1,15 @@
+frontend:
+  - "frontend/**"
+
+backend:
+  - "backend/**"
+
+config:
+  - ".github/**"
+  - "*.json"
+  - "*.yml"
+  - "*.yaml"
+
+documentation:
+  - "**/*.md"
+  - "README.md"
