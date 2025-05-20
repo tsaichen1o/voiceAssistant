@@ -1,0 +1,24 @@
+{
+    "name": "TUM Application Assistant",
+    "short_name": "TUM Assistant",
+    "description": "An accessible PWA to guide students applying to TUM using voice interaction.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#0066cc",
+    "orientation": "portrait",
+    "icons": [
+      {
+        "src": "/icons/web-app-manifest-192x192.png",
+        "sizes": "192x192",
+        "type": "image/png"
+      },
+      {
+        "src": "/icons/web-app-manifest-512x512.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ],
+    "splash_pages": null
+  }
+  
