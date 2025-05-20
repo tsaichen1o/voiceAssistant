@@ -1,0 +1,33 @@
+name: 🚀 Greetings from the Voice Assistant Team
+
+on: [pull_request_target, issues]
+
+jobs:
+  greeting:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+    - uses: actions/first-interaction@v1
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        issue-message: |
+          👋 **Hey there, brave explorer!**
+
+          Welcome to the Voice Assistant repo — we're thrilled to have you here!  
+          Thanks for opening your first issue 🎉
+
+          💡 *Tip*: Don’t hesitate to ask questions — even voice-based ones 😉  
+
+          May your bugs be few and your builds be green 💚
+        pr-message: |
+          🛠️ **First pull request? Big moment!**
+
+          Thank you for your contribution — you're officially part of the voice revolution! 🎙️  
+          Our maintainers will review this soon. Meanwhile, grab a ☕ and relax.
+
+          📢 Don’t forget to test on both desktop *and* mobile for maximum voice magic.  
+          🚀 Let's build something amazing together!
+
+          _– The TUM Application Assistant Team_
