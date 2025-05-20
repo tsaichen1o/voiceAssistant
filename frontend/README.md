@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🗣️ TUM Voice Application Assistant (Frontend)
 
-## Getting Started
+This is the frontend of the **TUM Application Voice Assistant**, a Progressive Web App (PWA) that helps prospective students explore TUM study programs using voice interaction. The app is mobile-first and designed to be accessible, including for visually impaired users.
 
-First, run the development server:
+🌐 **Live site**:  
+👉 [https://voice-assistant-gilt.vercel.app/](https://voice-assistant-gilt.vercel.app/)
+
+---
+
+## 🚀 Features
+
+- ✅ **Voice Input** (via Web Speech API)
+- ✅ **Voice Output** (via Text-to-Speech)
+- ✅ **LLM-powered** dynamic responses
+- ✅ **Mobile-first** interface
+- ✅ **PWA support** (installable on phones)
+- ✅ **Accessibility friendly**
+
+---
+
+## 🛠️ Getting Started (Local Development)
+
+### 1. Clone the repository
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/your-username/your-repo-name.git
+cd frontend
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install dependencies
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+yarn install
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Start the development server
 
-## Learn More
+```bash
+yarn dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Visit `http://localhost:3000` in your browser.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🧱 Built With
 
-## Deploy on Vercel
+* [Next.js 15](https://nextjs.org/)
+* [Tailwind CSS](https://tailwindcss.com/)
+* [next-pwa](https://github.com/shadowwalker/next-pwa)
+* [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📁 Project Structure
+
+```
+frontend/
+├── app/              # App Router pages & layouts
+├── public/           # Static files, icons, manifest
+├── styles/           # Global CSS (via Tailwind)
+├── next.config.ts    # PWA + Next.js config
+├── package.json
+└── README.md
+```
+
+## 📦 Deployment
+
+The project is deployed on **Vercel**. You can easily deploy it by connecting your GitHub repo to Vercel and setting the **root directory** to `frontend/`.
