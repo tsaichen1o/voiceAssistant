@@ -23,7 +23,7 @@ This is the frontend of the **TUM Application Voice Assistant**, a Progressive W
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/your-repo-name.git
+git clone https://github.com/tsaichen1o/voiceAssistant.git
 cd frontend
 ```
 
@@ -63,6 +63,8 @@ frontend/
 ├── package.json
 └── README.md
 ```
+
+---
 
 ## 📦 Deployment
 
