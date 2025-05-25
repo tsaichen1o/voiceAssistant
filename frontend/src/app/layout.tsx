@@ -1,22 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import "../styles/globals.css";
+// import { AuthProvider } from "@/context/AuthProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: 'TUM Application Assistant',
   description: 'An accessible PWA to guide students applying to TUM using voice interaction.',
   manifest: '/manifest.json',
-  themeColor: '#0066cc',
   icons: {
     icon: '/icons/favicon.ico',
     shortcut: '/icons/apple-touch-icon.png',
@@ -33,9 +23,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className="bg-yellow-50"
+        suppressHydrationWarning
       >
-        {children}
+        {/* TODO: AuthProvider */}
+        {/* <AuthProvider> */}
+          {children}
+        {/* </AuthProvider> */}
       </body>
     </html>
   );

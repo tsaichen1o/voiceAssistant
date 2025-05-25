@@ -9,12 +9,17 @@ This is the frontend of the **TUM Application Voice Assistant**, a Progressive W
 
 ## 🚀 Features
 
-- ✅ **Voice Input** (via Web Speech API)
-- ✅ **Voice Output** (via Text-to-Speech)
-- ✅ **LLM-powered** dynamic responses
+- ✅ **Voice Input** (via Web Speech API, with animated overlay and volume visualization)
+- ✅ **Voice Output** (Text-to-Speech for assistant replies)
+- ✅ **LLM-powered** dynamic responses (mocked for now)
 - ✅ **Mobile-first** interface
 - ✅ **PWA support** (installable on phones)
 - ✅ **Accessibility friendly**
+- ✅ **Multi-language support** (i18n with JSON backend, FAQ auto-switches language)
+- ✅ **FAQ Suggestions** (shows clickable FAQ when chat is empty, supports multi-language)
+- ✅ **Chat Interface** (user/assistant bubbles, typewriter effect for assistant, scroll-to-bottom button)
+- ✅ **File/Image Upload** (with preview)
+- ✅ **Sidebar with other information**
 
 ---
 
@@ -47,21 +52,49 @@ Visit `http://localhost:3000` in your browser.
 
 * [Next.js 15](https://nextjs.org/)
 * [Tailwind CSS](https://tailwindcss.com/)
+* [react-i18next](https://react.i18next.com/) + [i18next-http-backend](https://github.com/i18next/i18next-http-backend)
 * [next-pwa](https://github.com/shadowwalker/next-pwa)
 * [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API)
+* [uuid](https://www.npmjs.com/package/uuid)
 
 ---
 
 ## 📁 Project Structure
 
 ```
-frontend/
-├── app/              # App Router pages & layouts
-├── public/           # Static files, icons, manifest
-├── styles/           # Global CSS (via Tailwind)
-├── next.config.ts    # PWA + Next.js config
-├── package.json
-└── README.md
+frontend
+├── app
+│   ├── layout.tsx
+│   ├── page.tsx     # Landing page
+│   ├── login
+│   │    └── page.tsx
+│   └── chat
+│       ├── layout.tsx
+│       └── [userId]
+│           └── [sessionId]
+│               └── page.tsx
+├── components
+│   ├── LandingPage.tsx
+│   ├── ChatSidebar.tsx
+│   ├── ChatInterface.tsx
+│   ├── ChatInput.tsx
+│   ├── ChatMessagesList.tsx
+│   ├── ChatMessage.tsx
+│   ├── TypewriterText.tsx
+│   ├── VoiceAssistantOverlay.tsx
+├── locales
+│   └── en/translation.json
+│   └── zh/translation.json
+├── hooks
+│   └── useMicrophoneVolume.ts
+├── types
+│   └── chat.ts
+├── i18n.ts
+├── public
+│   ├── logo.png
+│   └── icons/
+└── styles
+    └── globals.css
 ```
 
 ---
@@ -69,3 +102,23 @@ frontend/
 ## 📦 Deployment
 
 The project is deployed on **Vercel**. You can easily deploy it by connecting your GitHub repo to Vercel and setting the **root directory** to `frontend/`.
+
+---
+
+## 🌍 Multi-language (i18n)
+- All FAQ and UI strings are managed via JSON files in `public/locales/{lang}/translation.json`.
+- Language switching is supported via i18next.
+
+---
+
+## 💡 Notable UI/UX Features
+- **FAQ Suggestions**: When chat is empty, clickable FAQ suggestions are shown (auto-translated).
+- **Voice Overlay**: Animated, volume-reactive overlay for voice input, with pause/close controls.
+- **Typewriter Effect**: Assistant replies are animated character-by-character.
+- **Scroll to Bottom**: Button appears when chat is not at the bottom.
+- **Responsive Design**: Works great on mobile and desktop.
+
+---
+
+## 📝 License
+MIT
