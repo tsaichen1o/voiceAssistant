@@ -1,11 +1,25 @@
-fastapi==0.95.0
-uvicorn==0.21.1
-pydantic==1.10.7
-openai==0.27.4
-python-dotenv==1.0.0
-sqlalchemy==2.0.7
-redis==4.5.4
-faiss-cpu==1.7.4
-numpy==1.24.2
-httpx==0.23.3
-python-multipart==0.0.6
+# FastAPI and ASGI server
+fastapi>=0.108.0
+uvicorn>=0.27.0
+python-dotenv>=1.0.0
+
+# OpenAI
+openai>=1.10.0
+
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+alembic>=1.13.0
+
+# Redis for session management
+redis>=5.0.0
+
+# Utilities
+pydantic>=2.5.0
+pydantic-settings>=2.0.0
+python-multipart>=0.0.6
+httpx>=0.25.0
+
+# Testing
+pytest>=7.4.0
+requests>=2.31.0
