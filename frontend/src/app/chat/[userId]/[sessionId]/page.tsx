@@ -1,14 +1,10 @@
 import ChatInterface from '@/components/ChatInterface';
 
-
-interface ChatPageProps {
-  params: {
-    userId: string;
-    sessionId: string;
-  };
+interface PageProps {
+  params: Promise<{ userId: string; sessionId: string }>;
 }
 
-export default async function ChatPage({ params }: ChatPageProps) {
+export default async function Page({ params }: PageProps) {
   const { userId, sessionId } = await params;
 
   if (!userId || !sessionId) {
