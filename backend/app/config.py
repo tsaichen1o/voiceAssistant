@@ -15,12 +15,17 @@ class Settings(BaseSettings):
 
     # Google Gemini API settings
     GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
     
-    # API Key authentication
+    # API Key authentication (former version)
     API_KEY_HEADER: str = "Authorization"
     API_KEY_PREFIX: str = "Bearer"
     API_KEY: str
+    
+    # Supabase settings
+    SUPABASE_URL: str
+    SUPABASE_ANON_KEY: str
+    SUPABASE_JWT_SECRET: str  # Get from supabase
     
     # Database settings - only use DATABASE_URL
     DATABASE_URL: str

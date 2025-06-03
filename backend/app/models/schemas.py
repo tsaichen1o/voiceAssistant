@@ -10,7 +10,7 @@ class Message(BaseModel):
     session_id: Optional[str] = None              
     role: Literal["system", "user", "assistant"]
     content: str
-    timestamp: Optional[datetime] = None
+    timestamp: int
 
 
 # OpenAI Usage models to handle the new API response structure

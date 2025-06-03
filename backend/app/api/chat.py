@@ -1,31 +1,33 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.models.schemas import ChatRequest, ChatResponse, RAGRequest
 from app.services.chat_service import get_chat_response, get_rag_chat_response
-from app.utils.auth import verify_api_key
+from app.utils.supabase_auth import verify_auth_flexible
+from typing import Dict, Any
 
 router = APIRouter(
     prefix="/api",
     tags=["chat"],
-    dependencies=[Depends(verify_api_key)]  # Apply API key auth to all endpoints
+    dependencies=[Depends(verify_auth_flexible)]  
 )
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, user_info: Dict[str, Any] = Depends(verify_auth_flexible)):
     """
     Chat with the OpenAI model.
     
     This endpoint processes a chat request and returns a response from the model.
     """
     try:
-        response = await get_chat_response(request)
+        # 现在传递user_info，实现用户级别的会话管理
+        response = await get_chat_response(request, user_info)
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/chat_rag", response_model=ChatResponse)
-async def chat_rag(request: RAGRequest):
+async def chat_rag(request: RAGRequest, user_info: Dict[str, Any] = Depends(verify_auth_flexible)):
     """
     Chat with RAG (Retrieval-Augmented Generation).
     
@@ -46,7 +48,7 @@ async def chat_rag(request: RAGRequest):
 
 
 @router.post("/chat_voice")
-async def chat_voice():
+async def chat_voice(user_info: Dict[str, Any] = Depends(verify_auth_flexible)):
     """
     Voice chat endpoint.
     
