@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     # OpenAI API settings
     OPENAI_API_KEY: str
     OPENAI_MODEL: str = "gpt-4o"
+
+    # Google Gemini API settings
+    GEMINI_API_KEY: str
+    GEMINI_MODEL: str = "gemini-1.5-flash"
     
     # API Key authentication
     API_KEY_HEADER: str = "Authorization"

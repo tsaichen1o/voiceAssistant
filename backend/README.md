@@ -1,10 +1,10 @@
 # Voice Assistant Backend
 
-A FastAPI-based backend service that provides ChatGPT functionality using OpenAI API, with session management and API key authentication.
+A FastAPI-based backend service that provides AI chat functionality using Google Gemini API, with session management and API key authentication.
 
 ## Features
 
-- **Text Chat**: Conversation using OpenAI GPT-4o model
+- **Text Chat**: Conversation using Google Gemini 1.5 Flash model
 - **Session Management**: Create, retrieve, and delete chat sessions
 - **Persistent Storage**: PostgreSQL + Redis hybrid architecture
 - **API Key Authentication**: Secure access to all endpoints
@@ -13,7 +13,7 @@ A FastAPI-based backend service that provides ChatGPT functionality using OpenAI
 ## Technology Stack
 
 - **Backend Framework**: FastAPI
-- **AI Model**: OpenAI GPT-4o
+- **AI Model**: Google Gemini 1.5 Flash
 - **Database**: PostgreSQL (persistent storage)
 - **Cache**: Redis (session cache and message queue)
 - **Authentication**: API Key Bearer Token
@@ -23,7 +23,7 @@ A FastAPI-based backend service that provides ChatGPT functionality using OpenAI
 - Python 3.10+
 - PostgreSQL database
 - Redis server
-- OpenAI API key
+- Google Gemini API key
 
 ## Installation & Setup
 
@@ -43,9 +43,9 @@ Create a `.env` file and configure the following variables:
 APP_NAME="Voice Assistant Backend"
 DEBUG=True
 
-# OpenAI API configuration
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-4o
+# Google Gemini API configuration
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-1.5-flash
 
 # API authentication
 API_KEY=your_secure_api_key_here
@@ -114,7 +114,7 @@ Send a message and get AI response
     "role": "assistant",
     "content": "Hello! How can I help you today?"
   },
-  "model": "gpt-4o",
+  "model": "gemini-1.5-flash",
   "usage": {...},
   "session_id": "session_uuid"
 }
@@ -158,7 +158,7 @@ backend/
 │   │   └── session_service.py # Session service
 │   ├── utils/             # Utility functions
 │   │   ├── auth.py        # Authentication utilities
-│   │   └── openai_client.py # OpenAI client
+│   │   └── openai_client.py # Gemini client (renamed for compatibility)
 │   ├── db/                # Database related
 │   │   ├── connection.py  # Database connection
 │   │   └── init_db.py     # Database initialization

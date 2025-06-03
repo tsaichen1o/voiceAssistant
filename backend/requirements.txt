@@ -5,7 +5,8 @@ python-dotenv>=1.0.0
 
 # OpenAI
 openai>=1.10.0
-
+# Google Gemini API
+google-generativeai>=0.3.0
 # Database
 sqlalchemy>=2.0.0
 psycopg2-binary>=2.9.0

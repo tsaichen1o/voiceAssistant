@@ -1,0 +1,70 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+id: voice-assistant
+name: ChatGPT Backend Rules (FastAPI + OpenAI)
+description: |
+  Custom development rules for a ChatGPT backend project built with FastAPI + OpenAI API. 
+  Supports API Key authentication and leaves room for future RAG and voice interaction features.
+
+folder_rules:
+  - pattern: app/api
+    description: |
+      - All route handlers grouped by feature modules using `APIRouter`.
+      - Keep endpoints thin: only handle request/response and delegate logic to `services/`.
+      - Suggested filenames: chat.py, auth.py, etc.
+    allowed_file_extensions: [".py"]
+
+  - pattern: app/models
+    description: |
+      - Contains all Pydantic models (schemas) and SQLAlchemy ORM models.
+      - Use `schemas.py` for request/response models and `db.py` for database models.
+    allowed_file_extensions: [".py"]
+
+  - pattern: app/services
+    description: |
+      - Core business logic layer.
+      - Route handlers should not directly call third-party APIs — only use services.
+      - Include separate files for RAG (`rag.py`) and voice (`voice.py`) for future extensions.
+    allowed_file_extensions: [".py"]
+
+  - pattern: app/utils
+    description: |
+      - General utilities: e.g. `openai_client.py`, `auth.py`, `cache.py`, `logger.py`.
+      - Focus on reusable logic, no business-specific code.
+    allowed_file_extensions: [".py"]
+
+  - pattern: app/config.py
+    description: |
+      - Centralized configuration using Pydantic's `BaseSettings`.
+      - Reads from `.env` and provides structured access to settings like API keys, DB URLs.
+    allowed_file_extensions: [".py"]
+
+  - pattern: main.py
+    description: |
+      - FastAPI application entry point.
+      - Loads routers, initializes config, and adds middleware.
+    allowed_file_extensions: [".py"]
+
+global_rules:
+  - pattern: ".*"
+    description: |
+      - All endpoints must require `Authorization: Bearer <API_KEY>` header.
+      - Chat request flow: api/chat.py → services/chat_service.py → utils/openai_client.py
+      - Redis may be used to cache chat context or messages.
+      - Stub endpoints `/chat_rag` and `/chat_voice` can be defined for future use (no logic yet).
+      - Service functions should be pure and side-effect free for testability and reuse.
+      - All inputs/outputs should be defined using Pydantic models.
+
+tags:
+  - fastapi
+  - openai
+  - api-key-auth
+  - backend
+  - cursor
+  - chatgpt
+  - rag
+  - redis
+

@@ -1,17 +1,17 @@
 from typing import List, Dict, Any
-from app.utils.openai_client import generate_chat_completion
+from app.utils.gemini_client import generate_chat_completion
 from app.models.schemas import Message, ChatRequest, ChatResponse, RAGRequest, Usage, CompletionTokensDetails, PromptTokensDetails
 from app.config import settings
-import openai
+import google.generativeai as genai
 from app.services.session_service import create_session, get_session, update_session
 
-# Configure OpenAI client
-client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+# Configure Gemini client
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
 
 async def get_chat_response(request: ChatRequest) -> ChatResponse:
     """
-    Process a chat request and return a response from the OpenAI model.
+    Process a chat request and return a response from the Gemini model.
     
     Args:
         request: The chat request containing messages and parameters
@@ -31,18 +31,32 @@ async def get_chat_response(request: ChatRequest) -> ChatResponse:
             # Create a new session if the provided ID doesn't exist
             session_id = create_session()
     
-    # Get OpenAI response
-    response = client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[m.model_dump() for m in request.messages],
-        temperature=request.temperature,
-        max_tokens=request.max_tokens
+    # Initialize Gemini model
+    model = genai.GenerativeModel(settings.GEMINI_MODEL)
+    
+    # Convert messages to Gemini format
+    conversation_text = ""
+    for message in request.messages:
+        if message.role == "user":
+            conversation_text += f"User: {message.content}\n"
+        elif message.role == "assistant":
+            conversation_text += f"Assistant: {message.content}\n"
+        elif message.role == "system":
+            conversation_text = f"System: {message.content}\n" + conversation_text
+    
+    # Generate response with Gemini
+    response = model.generate_content(
+        conversation_text,
+        generation_config=genai.types.GenerationConfig(
+            temperature=request.temperature,
+            max_output_tokens=request.max_tokens,
+        )
     )
     
     # Extract the response message
     assistant_message = Message(
         role="assistant",
-        content=response.choices[0].message.content
+        content=response.text
     )
     
     # Update session with message history
@@ -52,37 +66,19 @@ async def get_chat_response(request: ChatRequest) -> ChatResponse:
     
     # Convert usage to our Usage model if available
     usage_data = None
-    if response.usage:
-        # Handle completion_tokens_details
-        completion_details = None
-        if hasattr(response.usage, 'completion_tokens_details') and response.usage.completion_tokens_details:
-            completion_details = CompletionTokensDetails(
-                accepted_prediction_tokens=getattr(response.usage.completion_tokens_details, 'accepted_prediction_tokens', 0),
-                audio_tokens=getattr(response.usage.completion_tokens_details, 'audio_tokens', 0),
-                reasoning_tokens=getattr(response.usage.completion_tokens_details, 'reasoning_tokens', 0),
-                rejected_prediction_tokens=getattr(response.usage.completion_tokens_details, 'rejected_prediction_tokens', 0)
-            )
-        
-        # Handle prompt_tokens_details
-        prompt_details = None
-        if hasattr(response.usage, 'prompt_tokens_details') and response.usage.prompt_tokens_details:
-            prompt_details = PromptTokensDetails(
-                audio_tokens=getattr(response.usage.prompt_tokens_details, 'audio_tokens', 0),
-                cached_tokens=getattr(response.usage.prompt_tokens_details, 'cached_tokens', 0)
-            )
-        
+    if response.usage_metadata:
         usage_data = Usage(
-            completion_tokens=response.usage.completion_tokens,
-            prompt_tokens=response.usage.prompt_tokens,
-            total_tokens=response.usage.total_tokens,
-            completion_tokens_details=completion_details,
-            prompt_tokens_details=prompt_details
+            completion_tokens=response.usage_metadata.candidates_token_count,
+            prompt_tokens=response.usage_metadata.prompt_token_count,
+            total_tokens=response.usage_metadata.total_token_count,
+            completion_tokens_details=None,  # Gemini doesn't provide detailed breakdown
+            prompt_tokens_details=None
         )
     
     # Return the response
     return ChatResponse(
         message=assistant_message,
-        model=response.model,
+        model=settings.GEMINI_MODEL,
         usage=usage_data,
         session_id=session_id
     )
