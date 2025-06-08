@@ -12,9 +12,10 @@ import VoiceAssistantOverlay from './VoiceAssistantOverlay';
 
 interface ChatInputProps {
   onSend: (content: string) => void;
+  isDarkMode: boolean;
 }
 
-export default function ChatInput({ onSend }: ChatInputProps) {
+export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [preview, setPreview] = useState<string[]>([]);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -70,8 +71,12 @@ export default function ChatInput({ onSend }: ChatInputProps) {
   return (
     <>
       <VoiceAssistantOverlay open={voiceOpen} onClose={() => setVoiceOpen(false)} />
-      <div className="fixed bottom-0 left-0 w-full z-10 px-4 pb-4 bg-gradient-to-t from-white via-white/90 to-transparent md:ml-56">
-        <div className="sm:w-full md:w-[calc(100%-14rem)] bg-white rounded-3xl shadow-md border border-gray-300 px-4 pt-4 pb-3 flex flex-col gap-3 max-h-[60vh] overflow-y-auto">
+      <div className={`fixed bottom-0 left-0 w-full z-10 px-4 pb-4 ${isDarkMode ? 'bg-gradient-to-t from-gray-900 via-gray-900/90 to-transparent' : 'bg-gradient-to-t from-white via-white/90 to-transparent'} md:ml-56`}>
+        <div className={`sm:w-full md:w-[calc(100%-14rem)] rounded-3xl shadow-md border px-4 pt-4 pb-3 flex flex-col gap-3 max-h-[60vh] overflow-y-auto ${
+          isDarkMode 
+            ? 'bg-gray-800 border-gray-700' 
+            : 'bg-white border-gray-300'
+        }`}>
           {preview.length > 0 && (
             <div className="flex gap-2 mb-1 overflow-x-auto">
               {preview.map((img, idx) => (
@@ -83,7 +88,9 @@ export default function ChatInput({ onSend }: ChatInputProps) {
                   />
                   <button
                     onClick={() => handleRemovePreview(idx)}
-                    className="absolute -top-2 -right-2 bg-white text-black rounded-full p-1 shadow-sm"
+                    className={`absolute -top-2 -right-2 rounded-full p-1 shadow-sm ${
+                      isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-white text-black'
+                    }`}
                     title="Remove"
                     type="button"
                   >
@@ -101,11 +108,19 @@ export default function ChatInput({ onSend }: ChatInputProps) {
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder="Ask anything"
-            className="w-full pl-2 pr-1 text-base sm:text-lg text-gray-800 bg-transparent placeholder-gray-400 outline-none resize-none overflow-y-auto max-h-40"
+            className={`w-full pl-2 pr-1 text-base sm:text-lg bg-transparent outline-none resize-none overflow-y-auto max-h-40 ${
+              isDarkMode 
+                ? 'text-gray-200 placeholder-gray-500' 
+                : 'text-gray-800 placeholder-gray-400'
+            }`}
           />
 
           <div className="flex justify-between items-center h-10">
-            <label className="p-2 rounded-full text-gray-800 cursor-pointer border border-gray-300" title="Add">
+            <label className={`p-2 rounded-full cursor-pointer border ${
+              isDarkMode 
+                ? 'text-gray-200 border-gray-600 hover:bg-gray-700' 
+                : 'text-gray-800 border-gray-300 hover:bg-gray-100'
+            }`} title="Add">
               <RiAddLargeFill className="size-5" />
               <input
                 type="file"
@@ -120,7 +135,11 @@ export default function ChatInput({ onSend }: ChatInputProps) {
             {hasText || preview.length > 0 ? (
               <button
                 onClick={handleSubmit}
-                className="p-2 bg-gray-800 text-white rounded-full"
+                className={`p-2 rounded-full transition-colors duration-200 ${
+                  isDarkMode 
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                    : 'bg-gray-800 hover:bg-gray-900 text-white'
+                }`}
                 type="button"
                 title="Send"
               >
@@ -128,7 +147,11 @@ export default function ChatInput({ onSend }: ChatInputProps) {
               </button>
             ) : (
               <button
-                className="p-2 bg-gray-800 text-white rounded-full"
+                className={`p-2 rounded-full transition-colors duration-200 ${
+                  isDarkMode 
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                    : 'bg-gray-800 hover:bg-gray-900 text-white'
+                }`}
                 type="button"
                 title="Voice"
                 onClick={() => setVoiceOpen(true)}

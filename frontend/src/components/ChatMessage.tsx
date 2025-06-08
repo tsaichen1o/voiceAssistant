@@ -8,9 +8,10 @@ interface ChatMessageProps {
     message: Message;
     isTyping?: boolean;
     onTypingComplete?: () => void;
+    isDarkMode: boolean;
 }
 
-export default function ChatMessage({ message, isTyping, onTypingComplete }: ChatMessageProps) {
+export default function ChatMessage({ message, isTyping, onTypingComplete, isDarkMode }: ChatMessageProps) {
     const isUser = message.role === 'user';
 
     return (
@@ -26,7 +27,9 @@ export default function ChatMessage({ message, isTyping, onTypingComplete }: Cha
                     shadow
                     ${isUser
                         ? 'bg-[#2F70B3] text-white rounded-br-lg'
-                        : 'bg-white text-gray-900 rounded-bl-lg'
+                        : isDarkMode
+                            ? 'bg-gray-800 text-gray-200 rounded-bl-lg'
+                            : 'bg-white text-gray-900 rounded-bl-lg'
                     }`
                 }
             >
