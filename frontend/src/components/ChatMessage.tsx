@@ -23,6 +23,7 @@ export default function ChatMessage({ message, isTyping, onTypingComplete, isDar
                     rounded-2xl
                     text-base
                     break-words
+                    break-all
                     whitespace-pre-wrap
                     shadow
                     ${isUser
