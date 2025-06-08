@@ -64,7 +64,7 @@ export default function ChatMessagesList({ messages, isTyping, onTypingComplete,
                 <button
                     title="Scroll to bottom"
                     onClick={scrollToBottom}
-                    className={`fixed bottom-24 right-6 shadow-lg rounded-full p-2 z-50 border transition-colors duration-200 ${
+                    className={`fixed bottom-24 left-1/2 -translate-x-1/2 md:ml-14 shadow-lg rounded-full p-2 z-50 border transition-colors duration-200 cursor-pointer ${
                         isDarkMode 
                             ? 'bg-gray-800 border-gray-700 text-blue-400 hover:bg-gray-700' 
                             : 'bg-white/90 border-gray-200 text-[#2F70B3] hover:bg-blue-50'
