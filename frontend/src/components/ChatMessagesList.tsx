@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import ChatMessage from './ChatMessage';
-import { Message } from '@/types/chat';
+import { ChatMessage as ChatMessageType } from '@/types/chat';
 import { IoIosArrowDown } from 'react-icons/io';
 
 
 interface ChatMessagesListProps {
-    messages: Message[];
+    messages: ChatMessageType[];
     isTyping: boolean;
     onTypingComplete: () => void;
     isDarkMode: boolean;

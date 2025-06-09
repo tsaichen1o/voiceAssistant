@@ -1,11 +1,11 @@
 'use client';
 
-import { Message } from '@/types/chat';
+import { ChatMessage as ChatMessageType } from '@/types/chat';
 import TypewriterText from './TypewriterText';
 
 
 interface ChatMessageProps {
-    message: Message;
+    message: ChatMessageType;
     isTyping?: boolean;
     onTypingComplete?: () => void;
     isDarkMode: boolean;
