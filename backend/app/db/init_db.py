@@ -5,9 +5,9 @@ Run this script to initialize the PostgreSQL database with the required tables.
 
 import os
 import sys
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from app.config import settings
-from app.models.database import Base, User
+from app.models.database import Base
 from app.db.connection import engine
 
 
@@ -42,36 +42,6 @@ def init_db():
         return False
 
 
-def create_first_user():
-    """Create a first admin user if no users exist."""
-    from sqlalchemy.orm import Session
-    from app.db.connection import SessionLocal
-
-    db = SessionLocal()
-    try:
-        # Check if any users exist
-        user_count = db.query(User).count()
-        if user_count == 0:
-            # Create a default admin user
-            from app.utils.auth import get_password_hash
-            admin_user = User(
-                username="admin",
-                email="admin@example.com",
-                hashed_password=get_password_hash("admin"),
-                is_active=True
-            )
-            db.add(admin_user)
-            db.commit()
-            print("Created default admin user (username: admin, password: admin)")
-            print("IMPORTANT: Change this password in production!")
-        else:
-            print(f"Database already has {user_count} users, skipping default user creation")
-    except Exception as e:
-        print(f"Error creating default user: {e}")
-    finally:
-        db.close()
-
-
 def main():
     """Main initialization function."""
     # Check if we're running in the correct directory
@@ -102,6 +72,7 @@ def main():
     # create_first_user()
     
     print("✅ Database initialization complete!")
+    print("Now, go to Supabase dashboard or use Supabase API to create your first user if needed.")
 
 
 if __name__ == "__main__":

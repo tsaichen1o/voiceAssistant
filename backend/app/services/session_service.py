@@ -1,12 +1,13 @@
 import redis
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
-from app.models.database import Session, Chat, Message, User
+from app.models.database import Session, Chat, Message
 from app.config import settings
-from app.db.connection import engine, SessionLocal
+from app.db.connection import SessionLocal
+
 
 # Redis setup
 if hasattr(settings, 'REDIS_URL') and settings.REDIS_URL:
@@ -37,7 +38,7 @@ def create_session(user_id: Optional[str] = None) -> str:
     2. Cache active session in Redis for fast access
     """
     session_id = str(uuid.uuid4())
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     
     # 1. Store in PostgreSQL (permanent)
     with get_db_session() as db:
@@ -74,7 +75,7 @@ def create_session(user_id: Optional[str] = None) -> str:
     return session_id
 
 
-def get_session(session_id: str) -> Optional[Dict[str, Any]]:
+def get_session(session_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Get session with cache-first strategy.
     
@@ -82,12 +83,19 @@ def get_session(session_id: str) -> Optional[Dict[str, Any]]:
     1. Try Redis cache first (fast)
     2. Fall back to PostgreSQL if not in cache
     3. Re-cache in Redis if found in PostgreSQL
+    
+    Args:
+        session_id: The session ID to retrieve
+        user_id: Optional user ID for access control
     """
     
     # 1. Try Redis cache first
     cached_session = redis_client.get(f"session:{session_id}")
     if cached_session:
         session_data = json.loads(cached_session)
+        # Verify user access if user_id is provided
+        if user_id and session_data.get("user_id") != user_id:
+            return None
         # Extend cache TTL for active sessions
         redis_client.expire(f"session:{session_id}", ACTIVE_SESSION_EXPIRY)
         return session_data
@@ -95,7 +103,10 @@ def get_session(session_id: str) -> Optional[Dict[str, Any]]:
     # 2. Fall back to PostgreSQL
     with get_db_session() as db:
         try:
-            db_session = db.query(Session).filter(Session.id == session_id).first()
+            query = db.query(Session).filter(Session.id == session_id)
+            if user_id:
+                query = query.filter(Session.user_id == user_id)
+            db_session = query.first()
             
             if not db_session or not db_session.is_active:
                 return None
@@ -145,7 +156,7 @@ def update_session(session_id: str, messages: Optional[List[Dict]] = None) -> bo
     1. Update PostgreSQL (permanent record)
     2. Update Redis cache (fast access)
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     
     # 1. Update PostgreSQL
     with get_db_session() as db:
@@ -224,7 +235,7 @@ def update_session(session_id: str, messages: Optional[List[Dict]] = None) -> bo
     return True
 
 
-def delete_session(session_id: str) -> bool:
+def delete_session(session_id: str, user_id: Optional[str] = None) -> bool:
     """
     Delete session from both PostgreSQL and Redis.
     
@@ -236,7 +247,7 @@ def delete_session(session_id: str) -> bool:
     # 1. Soft delete in PostgreSQL
     with get_db_session() as db:
         try:
-            db_session = db.query(Session).filter(Session.id == session_id).first()
+            db_session = db.query(Session).filter(Session.id == session_id, Session.user_id == user_id).first()
             
             if not db_session:
                 return False
@@ -258,7 +269,7 @@ def delete_session(session_id: str) -> bool:
     return True
 
 
-def get_all_sessions() -> List[Dict[str, Any]]:
+def get_all_sessions(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Get all sessions from PostgreSQL.
     
@@ -268,7 +279,7 @@ def get_all_sessions() -> List[Dict[str, Any]]:
     with get_db_session() as db:
         try:
             # Get all active sessions
-            db_sessions = db.query(Session).filter(Session.is_active == True).all()
+            db_sessions = db.query(Session).filter(Session.is_active == True, Session.user_id == user_id).all()
             
             sessions = []
             for db_session in db_sessions:
@@ -335,7 +346,7 @@ def cleanup_expired_sessions():
     Background task to clean up expired sessions.
     Can be run periodically via cron or Celery.
     """
-    expiry_time = datetime.utcnow() - timedelta(days=30)  # 30 days old
+    expiry_time = datetime.now(timezone.utc) - timedelta(days=30)  # 30 days old
     
     with get_db_session() as db:
         try:

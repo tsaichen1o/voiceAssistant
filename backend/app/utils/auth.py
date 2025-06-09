@@ -1,3 +1,7 @@
+# UNUSED
+# This file is used to verify the API key
+# When testing without frontend.
+
 from fastapi import HTTPException, Depends, Header
 from app.config import settings
 from typing import Optional

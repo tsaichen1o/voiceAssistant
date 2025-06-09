@@ -1,9 +1,12 @@
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from app.utils.gemini_client import generate_chat_completion
 from app.models.schemas import Message, ChatRequest, ChatResponse, RAGRequest, Usage, CompletionTokensDetails, PromptTokensDetails
 from app.config import settings
 import google.generativeai as genai
 from app.services.session_service import create_session, get_session, update_session
+from datetime import datetime, UTC
+import uuid
+
 
 # Configure Gemini client
 genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -25,21 +28,17 @@ async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, 
     user_id = user_info.get("user_id") if user_info else None
     
     if not session_id:
-        # Create a new session - with user ID if available
         if user_info and user_info.get("auth_type") == "supabase":
             session_id = create_session(user_id=user_id)
         else:
-            # API Key users or legacy - create session without user ID
             session_id = create_session()
     else:
-        # Get existing session - verify ownership if user is authenticated
         if user_info and user_info.get("auth_type") == "supabase":
             session = get_session(session_id, user_id=user_id)
         else:
             session = get_session(session_id)
             
         if not session:
-            # Create a new session if the provided ID doesn't exist or user doesn't have access
             if user_info and user_info.get("auth_type") == "supabase":
                 session_id = create_session(user_id=user_id)
             else:
@@ -59,6 +58,7 @@ async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, 
             conversation_text = f"System: {message.content}\n" + conversation_text
     
     # Generate response with Gemini
+    # TODO: add system prompt
     response = model.generate_content(
         conversation_text,
         generation_config=genai.types.GenerationConfig(
@@ -69,8 +69,11 @@ async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, 
     
     # Extract the response message
     assistant_message = Message(
+        id=str(uuid.uuid4()),
+        session_id=session_id,
         role="assistant",
-        content=response.text
+        content=response.text,
+        timestamp=datetime.now(UTC).isoformat()
     )
     
     # Update session with message history - include user context
@@ -89,9 +92,10 @@ async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, 
             completion_tokens=response.usage_metadata.candidates_token_count,
             prompt_tokens=response.usage_metadata.prompt_token_count,
             total_tokens=response.usage_metadata.total_token_count,
-            completion_tokens_details=None,  # Gemini doesn't provide detailed breakdown
+            completion_tokens_details=None,
             prompt_tokens_details=None
         )
+    # 💢 the schema is not correct
     
     # Return the response
     return ChatResponse(
@@ -115,13 +119,21 @@ async def get_rag_chat_response(request: RAGRequest) -> ChatResponse:
         ChatResponse: The model's response
     """
     # For now, just return a message that this feature is coming soon
+    # TODO: add system prompt
+    session_id = request.session_id or "rag_placeholder_session"
+    assistant_message = Message(
+        id=str(uuid.uuid4()),
+        session_id=session_id,
+        role="assistant",
+        content="RAG-enhanced chat is coming soon. This feature will allow the model to reference external documents.",
+        timestamp=datetime.now(UTC).isoformat()
+    )
+    
     return ChatResponse(
-        message=Message(
-            role="assistant",
-            content="RAG-enhanced chat is coming soon. This feature will allow the model to reference external documents."
-        ),
+        message=assistant_message,
         model="placeholder",
-        usage=None
+        usage=None,
+        session_id=session_id
     )
 
 

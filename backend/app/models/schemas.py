@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal, Dict, Any
+from typing import List, Optional, Literal
 from datetime import datetime
-from uuid import UUID
+
 
 class Message(BaseModel):
     """Chat message model."""
@@ -10,7 +10,7 @@ class Message(BaseModel):
     session_id: Optional[str] = None              
     role: Literal["system", "user", "assistant"]
     content: str
-    timestamp: int
+    timestamp: datetime
 
 
 # OpenAI Usage models to handle the new API response structure
