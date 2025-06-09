@@ -1,31 +1,42 @@
-# FastAPI and ASGI server
+# === Core Web Framework ===
+# FastAPI and the ASGI server
 fastapi>=0.108.0
 uvicorn>=0.27.0
+gunicorn>=23.0.0,<24.0.0
 python-dotenv>=1.0.0
 
-# OpenAI
-openai>=1.10.0
+# === AI / LLM Services ===
 # Google Gemini API
 google-generativeai>=0.3.0
-# Database
+# openai>=1.10.0  # If you are no longer using OpenAI, you can remove this line
+
+# === Database & ORM ===
+# SQLAlchemy for database interaction and Alembic for migrations
 sqlalchemy>=2.0.0
-psycopg2-binary>=2.9.0
+psycopg2-binary>=2.9.0  # PostgreSQL adapter
 alembic>=1.13.0
 
-# Redis for session management
+# === Caching ===
+# Redis client for session management and caching
 redis>=5.0.0
 
-# Utilities
+# === Data Validation & Settings ===
+# Pydantic is crucial for FastAPI's data validation
 pydantic>=2.5.0
 pydantic-settings>=2.0.0
-python-multipart>=0.0.6
-httpx>=0.25.0
 
-# Testing
+# === Utilities ===
+# Required by FastAPI for form data
+python-multipart>=0.0.6
+# HTTP client for making requests (often used in testing)
+httpx>=0.25.0
+# For handling JSON Web Tokens
+PyJWT>=2.10.1
+
+# === Testing ===
 pytest>=7.4.0
 requests>=2.31.0
 
-# Other
-protobuf>=6.31.1
-PyJWT>=2.10.1
-gunicorn>=23.0.0,<24.0.0
+# NOTE: protobuf has been removed from this file.
+# It is a sub-dependency of 'google-generativeai' and will be
+# installed automatically by pip with a compatible version.
