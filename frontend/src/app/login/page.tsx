@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthProvider';
 import { FaGoogle } from "react-icons/fa";
 
 
@@ -47,7 +47,7 @@ export default function LoginPage() {
         <div className="mt-8">
           <button
             onClick={signInWithGoogle}
-            className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#2F70B3] hover:bg-[#2460A0] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2F70B3]"
+            className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#2F70B3] hover:bg-[#2460A0] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2F70B3] cursor-pointer"
           >
             <FaGoogle className="size-5 mr-2" />
             Sign in with Google

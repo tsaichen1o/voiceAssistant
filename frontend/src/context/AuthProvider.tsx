@@ -1,45 +1,70 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
+import { User } from '@supabase/supabase-js';
 import { supabase } from '@/libs/supabase';
-import { Session, User } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
 
 
-type AuthContextType = {
-  session: Session | null;
+interface AuthContextType {
   user: User | null;
-  signOut: () => void;
-};
+  loading: boolean;
+  signInWithGoogle: () => Promise<void>;
+  signOut: () => Promise<void>;
+}
 
-const AuthContext = createContext<AuthContextType>({
-  session: null,
-  user: null,
-  signOut: () => {},
-});
+const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const user = session?.user ?? null;
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('[useEffect] getSession:', session, error);
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[onAuthStateChange]', event, session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
-    return () => {
-      listener?.subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
-  const signOut = () => supabase.auth.signOut();
+  const signInWithGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   return (
-    <AuthContext.Provider value={{ session, user, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
 export const useAuth = () => useContext(AuthContext);

@@ -1,11 +1,12 @@
-export interface Message {
+export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  session_id: string;
+  role: 'user' | 'assistant' | 'system';
   content: string;
-  timestamp: number;
+  timestamp: string;
 }
 
 export interface ChatSession {
   id: string;
-  messages: Message[];
+  messages: ChatMessage[];
 } 

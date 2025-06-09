@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { IoCloseSharp, IoTrashOutline } from 'react-icons/io5';
 import { useAuth } from '@/context/AuthProvider';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createChatSession, deleteChatSession, getChatSessions } from '@/services/api';
 
 
 interface ChatSidebarProps {
@@ -12,23 +13,72 @@ interface ChatSidebarProps {
   isDarkMode: boolean;
 }
 
+interface Session {
+  id: string;
+  title?: string;
+}
+
+interface SessionHistoryResponse {
+  session_id: string;
+  title?: string;
+  created_at: string;
+  last_active: string;
+  message_count: number;
+  user_id: string;
+}
+
 export default function ChatSidebar({ isOpen, onClose, isDarkMode }: ChatSidebarProps) {
   const { user } = useAuth();
   const userId = user?.id;
-
-  // TODO: Get sessions from user
-  // TODO: Add session creation
-  const [sessions, setSessions] = useState([
-    { id: 'Info01' },
-    { id: 'Change me!' }
-  ]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const handleDelete = () => {
-    if (deleteId) {
-      setSessions(sessions => sessions.filter(s => s.id !== deleteId));
-      setDeleteId(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchSessions = async () => {
+    if (!userId) return;
+    try {
+      const response = await getChatSessions();
+      const formattedSessions = response.map((session: SessionHistoryResponse) => ({
+        id: session.session_id,
+        title: session.title || 'New Chat'
+      }));
+      setSessions(formattedSessions);
+    } catch (error) {
+      console.error('Failed to fetch sessions:', error);
     }
   };
+
+  const handleCreateSession = async () => {
+    if (!userId) return;
+    setIsLoading(true);
+    try {
+      const response = await createChatSession();
+      if (response.session_id) {
+        await fetchSessions();
+      }
+    } catch (error) {
+      console.error('Failed to create session:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await deleteChatSession(deleteId);
+      setSessions(sessions => sessions.filter(s => s.id !== deleteId));
+      setDeleteId(null);
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchSessions();
+    }
+  }, [userId]);
 
   return (
     <>
@@ -42,7 +92,7 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode }: ChatSidebar
         <div className={`h-14 pl-4 pr-2 border-b flex justify-between items-center ${
           isDarkMode ? 'border-gray-700' : 'border-gray-200'
         }`}>
-          <h3 className={`font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Information</h3>
+          <h3 className={`font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Chat Sessions</h3>
           <button
             className={`sm:hidden pr-1 rounded-full transition-colors duration-200 ${
               isDarkMode 
@@ -56,6 +106,17 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode }: ChatSidebar
           </button>
         </div>
         <div className={`p-2 space-y-1 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+          <button
+            onClick={handleCreateSession}
+            disabled={isLoading}
+            className={`w-full p-2 rounded-md transition-colors duration-200 ${
+              isDarkMode 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : 'bg-blue-500 hover:bg-blue-600 text-white'
+            } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {isLoading ? 'Creating...' : 'New Chat'}
+          </button>
           {sessions.map((session) => (
             <div key={session.id} className="flex items-center group">
               <Link
@@ -67,7 +128,7 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode }: ChatSidebar
                 }`}
                 onClick={onClose}
               >
-                {session.id}
+                {session.title}
               </Link>
               <button
                 className={`ml-2 p-1 opacity-60 hover:opacity-100 rounded-full transition-colors duration-200 ${
@@ -84,42 +145,33 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode }: ChatSidebar
           ))}
         </div>
       </aside>
+
       {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-          <div className={`rounded-xl shadow-xl p-6 w-[90%] max-w-xs ${
-            isDarkMode ? 'bg-gray-800' : 'bg-white'
-          }`}>
-            <div className={`text-lg font-semibold mb-3 ${
-              isDarkMode ? 'text-gray-200' : 'text-gray-800'
-            }`}>
-              Are you sure you want to delete this conversation?
-            </div>
-            <div className="flex justify-end gap-3 mt-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <p className={`mb-4 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+              Are you sure you want to delete this chat?
+            </p>
+            <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setDeleteId(null)}
-                className={`px-4 py-1 rounded transition-colors duration-200 ${
+                className={`px-4 py-2 rounded-md ${
                   isDarkMode 
                     ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' 
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
                 }`}
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                className="px-4 py-1 rounded bg-red-500 hover:bg-red-600 text-white transition-colors duration-200"
+                className="px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white"
               >
                 Delete
               </button>
             </div>
           </div>
         </div>
-      )}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 sm:hidden"
-          onClick={onClose}
-        />
       )}
     </>
   );

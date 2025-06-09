@@ -71,7 +71,7 @@ frontend
 │   └── chat
 │       ├── layout.tsx
 │       └── [userId]
-│           └── [sessionId]
+│           └── [chatSessionId]
 │               └── page.tsx
 ├── components
 │   ├── LandingPage.tsx

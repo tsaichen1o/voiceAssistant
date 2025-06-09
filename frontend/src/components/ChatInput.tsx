@@ -8,17 +8,23 @@ import {
   RiCloseFill,
 } from 'react-icons/ri';
 import VoiceAssistantOverlay from './VoiceAssistantOverlay';
+import { sendMessage } from '@/services/api';
+import { ChatMessage } from '@/types/chat';
+import { v4 as uuidv4 } from 'uuid';
 
 
 interface ChatInputProps {
   onSend: (content: string) => void;
   isDarkMode: boolean;
+  chatSessionId: string;
+  onTitleUpdate?: (title: string) => void;
 }
 
-export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
+export default function ChatInput({ onSend, isDarkMode, chatSessionId, onTitleUpdate }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [preview, setPreview] = useState<string[]>([]);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasText = input.trim().length > 0;
@@ -33,7 +39,6 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
-
     files.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -49,13 +54,35 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
     setPreview((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const handleSubmit = () => {
-    if (input.trim()) {
+  const handleSubmit = async () => {
+    if (!input.trim() || isSending) return;
+
+    setIsSending(true);
+    try {
+      const message: ChatMessage = {
+        id: uuidv4(),
+        session_id: chatSessionId,
+        role: 'user',
+        content: input,
+        timestamp: new Date().toISOString(),
+      };
+
+      await sendMessage([message], chatSessionId);
+
+      if (onTitleUpdate) {
+        const title = input.slice(0, 50);
+        onTitleUpdate(title + (input.length > 50 ? '...' : ''));
+      }
+
       onSend(input);
       setInput('');
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -108,11 +135,12 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder="Ask anything"
+            disabled={isSending}
             className={`w-full pl-2 pr-1 text-base sm:text-lg bg-transparent outline-none resize-none overflow-y-auto max-h-40 ${
               isDarkMode 
                 ? 'text-gray-200 placeholder-gray-500' 
                 : 'text-gray-800 placeholder-gray-400'
-            }`}
+            } ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`}
           />
 
           <div className="flex justify-between items-center h-10">
@@ -120,7 +148,7 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
               isDarkMode 
                 ? 'text-gray-200 border-gray-600 hover:bg-gray-700' 
                 : 'text-gray-800 border-gray-300 hover:bg-gray-100'
-            }`} title="Add">
+            } ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`} title="Add">
               <RiAddLargeFill className="size-5" />
               <input
                 type="file"
@@ -128,6 +156,7 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
                 multiple
                 onChange={handleFileChange}
                 className="hidden"
+                disabled={isSending}
                 title="Add"
               />
             </label>
@@ -135,13 +164,14 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
             {hasText || preview.length > 0 ? (
               <button
                 onClick={handleSubmit}
+                disabled={isSending}
                 className={`p-2 rounded-full transition-colors duration-200 ${
                   isDarkMode 
                     ? 'bg-blue-600 hover:bg-blue-700 text-white' 
                     : 'bg-gray-800 hover:bg-gray-900 text-white'
-                }`}
+                } ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`}
                 type="button"
-                title="Send"
+                title={isSending ? 'Sending...' : 'Send'}
               >
                 <RiSendPlane2Fill className="size-5" />
               </button>
@@ -151,10 +181,11 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
                   isDarkMode 
                     ? 'bg-blue-600 hover:bg-blue-700 text-white' 
                     : 'bg-gray-800 hover:bg-gray-900 text-white'
-                }`}
+                } ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`}
                 type="button"
                 title="Voice"
                 onClick={() => setVoiceOpen(true)}
+                disabled={isSending}
               >
                 <RiChatVoiceAiFill className="size-5" />
               </button>

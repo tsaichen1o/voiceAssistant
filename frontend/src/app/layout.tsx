@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "../styles/globals.css";
-// import { AuthProvider } from "@/context/AuthProvider";
+import { AuthProvider } from "@/context/AuthProvider";
 
 
 export const metadata: Metadata = {
@@ -26,10 +26,9 @@ export default function RootLayout({
         className="bg-yellow-50"
         suppressHydrationWarning
       >
-        {/* TODO: AuthProvider */}
-        {/* <AuthProvider> */}
+        <AuthProvider>
           {children}
-        {/* </AuthProvider> */}
+        </AuthProvider>
       </body>
     </html>
   );
