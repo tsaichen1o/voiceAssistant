@@ -2,6 +2,7 @@
 
 import { ChatMessage as ChatMessageType } from '@/types/chat';
 import TypewriterText from './TypewriterText';
+import ReactMarkdown from 'react-markdown';
 
 
 interface ChatMessageProps {
@@ -13,6 +14,11 @@ interface ChatMessageProps {
 export default function ChatMessage({ message, onStreamingComplete, isDarkMode }: ChatMessageProps) {
     const isUser = message.role === 'user';
 
+    const userBubbleClasses = `
+        bg-[#2F70B3] text-white rounded-br-lg
+        px-4 py-2 rounded-2xl shadow
+    `;
+
     // When the SSE data stream is complete, a callback function can be triggered
     // NOTE: this step is optional, but it helps to update the parent's message state after the stream ends
     const handleComplete = (finalContent: string) => {
@@ -22,25 +28,22 @@ export default function ChatMessage({ message, onStreamingComplete, isDarkMode }
         }
     };
 
+    // Build the classes for the assistant text
+    const assistantTextClasses = `
+        ${isDarkMode ? 'prose-invert text-gray-200' : 'prose text-gray-800'} max-w-none 
+    `;
+
     return (
-        <div className={`flex w-full my-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
+        <div className={`flex w-full my-1 ${isUser ? 'justify-end' : 'justify-start pl-6 pr-4 py-2'}`}>
             <div
                 className={`
                     max-w-[80%]
-                    px-4 py-2
-                    rounded-2xl
                     text-base
                     break-words
                     break-all
                     whitespace-pre-wrap
-                    shadow
-                    ${isUser
-                        ? 'bg-[#2F70B3] text-white rounded-br-lg'
-                        : isDarkMode
-                            ? 'bg-gray-800 text-gray-200 rounded-bl-lg'
-                            : 'bg-white text-gray-900 rounded-bl-lg'
-                    }`
-                }
+                    ${isUser ? userBubbleClasses : assistantTextClasses}
+                `}
             >
                 {!isUser && message.isStreaming && message.streamUrl ? (
                     <TypewriterText 
@@ -48,7 +51,9 @@ export default function ChatMessage({ message, onStreamingComplete, isDarkMode }
                         onComplete={handleComplete}
                     />
                 ) : (
-                    message.content
+                    <ReactMarkdown>
+                        {message.content}
+                    </ReactMarkdown>
                 )}
             </div>
         </div>

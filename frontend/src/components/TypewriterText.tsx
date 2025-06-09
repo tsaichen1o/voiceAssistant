@@ -16,48 +16,66 @@ export default function TypewriterText({ streamUrl, onComplete }: TypewriterText
   const [displayedText, setDisplayedText] = useState('');
 
   useEffect(() => {
+    let isCancelled = false;
     const abortController = new AbortController();
-  
+
     const startStream = async () => {
       const token = await getAccessToken();
-
       let finalAccumulatedText = '';
-  
+
       await fetchEventSource(streamUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
         },
         signal: abortController.signal,
         onmessage(event) {
+          if (isCancelled) return;
+
           if (event.data === '[done]') {
             abortController.abort();
-            if (onComplete) onComplete(finalAccumulatedText);
-          } else if (event.data.startsWith('[error]')) {
+            if (onComplete) {
+              onComplete(finalAccumulatedText);
+            }
+            return;
+          }
+
+          if (event.data.startsWith('[error]')) {
+            console.error("Stream error from server:", event.data);
             abortController.abort();
-            setDisplayedText('Stream failed, please try again!');
-          } else {
-            const chunk = event.data;
-            finalAccumulatedText += chunk;
-            setDisplayedText((prev) => prev + chunk);
+            return;
+          }
+
+          // NOTE: since the backend is now sending a JSON object, we need to parse it
+          try {
+            const payload = JSON.parse(event.data);
+            
+            const chunk = payload.content;
+
+            if (typeof chunk === 'string') {
+              finalAccumulatedText += chunk;
+              setDisplayedText((prev) => prev + chunk);
+            }
+          } catch (e) {
+            console.error("Failed to parse stream data:", event.data, e);
           }
         },
         onerror(err) {
-          console.error("EventSource failed:", err);
+          if (!isCancelled) {
+            console.error("EventSource failed:", err);
+          }
           abortController.abort();
-          throw err;
-        },
-        onclose() {
-          console.log("Stream closed");
-        },
+          throw err; 
+        }
       });
     };
-  
+
     startStream();
-  
+
     return () => {
+      isCancelled = true;
       abortController.abort();
     };
-  }, [streamUrl, onComplete, displayedText]);
+  }, [streamUrl, onComplete]);
 
   return <span>{displayedText}</span>;
 }
