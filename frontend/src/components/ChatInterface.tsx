@@ -106,7 +106,6 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
     const loadSessionHistory = async () => {
       try {
         const history = await getChatSessionHistory(chatSessionId);
-        console.log('history', history);
         if (history.messages) {
           const formattedMessages = history.messages.map((msg: { role: string; content: string; created_at: string }) => ({
             id: uuidv4(),

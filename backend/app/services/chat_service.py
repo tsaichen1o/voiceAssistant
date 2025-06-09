@@ -67,14 +67,15 @@ async def stream_chat_response(messages: list, stream_id: str) -> AsyncGenerator
                 data_payload = {"content": chunk.text}
                 yield f"data: {json.dumps(data_payload)}\n\n"
                 await asyncio.sleep(0.02)
+        yield "data: [done]\n\n"
 
     except Exception as e:
         print(f"Error during stream generation: {e}")
         yield f"data: [error] An error occurred while generating the response.\n\n"
+
     finally:
         redis_client.delete(f"stream_request:{stream_id}")
         print(f"Cleaned up Redis key for stream: {stream_id}")
-        yield "data: [done]\n\n"
 
 
 async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, Any]] = None) -> ChatResponse:
