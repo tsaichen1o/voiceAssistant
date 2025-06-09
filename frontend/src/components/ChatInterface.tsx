@@ -174,7 +174,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
           </p>
           <button
             onClick={toggleDarkMode}
-            className={`p-2 rounded-full absolute right-4 transition-colors duration-200 ${isDarkMode ? 'text-yellow-400 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100'}`}
+            className={`p-2 rounded-full absolute right-4 transition-colors duration-200 cursor-pointer ${isDarkMode ? 'text-yellow-400 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100'}`}
             title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDarkMode ? <FaSun size={20} /> : <FaMoon size={20} />}
