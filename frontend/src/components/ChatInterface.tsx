@@ -58,7 +58,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
       session_id: chatSessionId,
       role: 'user',
       content,
-      timestamp: now,
+      created_at: now,
     };
     setMessages(prev => [...prev, userMessage]);
 
@@ -68,9 +68,11 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
 
       const response = await sendMessage(
         [...messages, userMessage].map(msg => ({
+          id: uuidv4(),
+          session_id: chatSessionId,
           role: msg.role,
           content: msg.content,
-          timestamp: msg.timestamp,
+          created_at: msg.created_at,
         })),
         chatSessionId
       );
@@ -80,7 +82,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
         session_id: chatSessionId,
         role: 'assistant',
         content: response.message.content,
-        timestamp: response.message.timestamp || now,
+        created_at: response.message.created_at || now,
       };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
@@ -102,12 +104,14 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
     const loadSessionHistory = async () => {
       try {
         const history = await getChatSessionHistory(chatSessionId);
+        console.log('history', history);
         if (history.messages) {
-          const formattedMessages = history.messages.map((msg: { role: string; content: string; timestamp: string }) => ({
+          const formattedMessages = history.messages.map((msg: { role: string; content: string; created_at: string }) => ({
             id: uuidv4(),
+            session_id: chatSessionId,
             role: msg.role,
             content: msg.content,
-            timestamp: new Date(msg.timestamp).toISOString(),
+            created_at: new Date(msg.created_at).toISOString(),
           }));
           setMessages(formattedMessages);
         }

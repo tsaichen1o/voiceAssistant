@@ -64,7 +64,7 @@ export default function ChatInput({ onSend, isDarkMode, chatSessionId, onTitleUp
         session_id: chatSessionId,
         role: 'user',
         content: input,
-        timestamp: new Date().toISOString(),
+        created_at: new Date().toISOString(),
       };
 
       await sendMessage([message], chatSessionId);

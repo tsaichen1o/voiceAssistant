@@ -1,4 +1,5 @@
 import { supabase } from '@/libs/supabase';
+import { ChatMessage } from '@/types/chat';
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -73,8 +74,8 @@ export async function deleteChatSession(chatSessionId: string) {
 
 // ------------------ Chat Message API ------------------
 export async function sendMessage(
-  messages: Array<{ role: string, content: string, timestamp: string }>,
-    chatSessionId?: string
+  messages: ChatMessage[],
+  chatSessionId?: string
 ) {
   const token = await getAccessToken();
 

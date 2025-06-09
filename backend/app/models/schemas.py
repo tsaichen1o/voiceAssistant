@@ -5,12 +5,11 @@ from datetime import datetime
 
 class Message(BaseModel):
     """Chat message model."""
-    
     id: Optional[str] = None                      
     session_id: Optional[str] = None              
     role: Literal["system", "user", "assistant"]
     content: str
-    timestamp: datetime
+    created_at: datetime
 
 
 # OpenAI Usage models to handle the new API response structure
@@ -39,7 +38,6 @@ class Usage(BaseModel):
 
 class ChatRequest(BaseModel):
     """Request model for chat completion."""
-    
     messages: List[Message]
     temperature: Optional[float] = Field(0.7, ge=0.0, le=1.0)
     max_tokens: Optional[int] = Field(1000, gt=0, le=8192)
@@ -49,7 +47,6 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     """Response model for chat completion."""
-    
     message: Message
     model: str
     usage: Optional[Usage] = None
@@ -59,7 +56,6 @@ class ChatResponse(BaseModel):
 # Session models
 class SessionInfo(BaseModel):
     """Session information model."""
-    
     session_id: str
     created_at: datetime
     last_active: datetime
@@ -70,14 +66,12 @@ class SessionInfo(BaseModel):
 
 class SessionResponse(BaseModel):
     """Response model for session operations."""
-    
     session_id: str  # Changed to str for consistency
     created: bool = True
 
 
 class SessionHistoryResponse(BaseModel):
     """Response model for retrieving session chat history."""
-    
     session_id: str  # Changed to str for consistency
     title: Optional[str] = None
     messages: List[Message]
@@ -88,7 +82,6 @@ class SessionHistoryResponse(BaseModel):
 # RAG models
 class RAGRequest(ChatRequest):
     """Request model for RAG-enhanced chat (for future use)."""
-    
     query: str
     use_rag: bool = True
 
@@ -96,13 +89,11 @@ class RAGRequest(ChatRequest):
 # Voice models
 class VoiceRequest(BaseModel):
     """Request model for voice transcription (for future use)."""
-    
     audio_data: str  # Base64 encoded audio
     language: Optional[str] = "en"
 
 
 class TranscriptionResponse(BaseModel):
     """Response model for voice transcription (for future use)."""
-    
     text: str
     confidence: Optional[float] = None 

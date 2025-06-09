@@ -74,7 +74,6 @@ def create_session(user_id: Optional[str] = None) -> str:
     
     return session_id
 
-
 def get_session(session_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Get session with cache-first strategy.
@@ -88,45 +87,43 @@ def get_session(session_id: str, user_id: Optional[str] = None) -> Optional[Dict
         session_id: The session ID to retrieve
         user_id: Optional user ID for access control
     """
-    
-    # 1. Try Redis cache first
+
     cached_session = redis_client.get(f"session:{session_id}")
     if cached_session:
         session_data = json.loads(cached_session)
-        # Verify user access if user_id is provided
-        if user_id and session_data.get("user_id") != user_id:
-            return None
-        # Extend cache TTL for active sessions
-        redis_client.expire(f"session:{session_id}", ACTIVE_SESSION_EXPIRY)
-        return session_data
-    
-    # 2. Fall back to PostgreSQL
+        if not session_data.get("messages"):
+            print('Redis cache messages is empty, fallback to DB')
+        else:
+            if user_id and session_data.get("user_id") != user_id:
+                return None
+            redis_client.expire(f"session:{session_id}", ACTIVE_SESSION_EXPIRY)
+            return session_data
+    else:
+        print('Redis cache is empty, fallback to DB')
+
     with get_db_session() as db:
         try:
             query = db.query(Session).filter(Session.id == session_id)
             if user_id:
                 query = query.filter(Session.user_id == user_id)
             db_session = query.first()
-            
             if not db_session or not db_session.is_active:
                 return None
-            
-            # Get messages from database
+
             chats = db.query(Chat).filter(Chat.session_id == session_id).all()
+            print('chats', chats)
             messages = []
-            
             for chat in chats:
-                chat_messages = db.query(Message).filter(
-                    Message.chat_id == chat.id
-                ).order_by(Message.created_at).all()
-                
+                chat_messages = db.query(Message).filter(Message.chat_id == chat.id).order_by(Message.created_at).all()
                 for msg in chat_messages:
                     messages.append({
+                        "id": str(msg.id),
+                        "session_id": session_id,
                         "role": msg.role,
                         "content": msg.content,
-                        "timestamp": msg.created_at.isoformat()
+                        "chat_id": str(msg.chat_id),
+                        "created_at": msg.created_at.isoformat() if isinstance(msg.created_at, datetime) else str(msg.created_at)
                     })
-            
             session_data = {
                 "session_id": session_id,
                 "created_at": db_session.created_at.isoformat(),
@@ -134,17 +131,14 @@ def get_session(session_id: str, user_id: Optional[str] = None) -> Optional[Dict
                 "user_id": str(db_session.user_id) if db_session.user_id else None,
                 "messages": messages
             }
-            
-            # 3. Re-cache in Redis for next time
             redis_client.setex(
                 f"session:{session_id}",
                 ACTIVE_SESSION_EXPIRY,
                 json.dumps(session_data)
             )
-            
             return session_data
-            
         except Exception as e:
+            print('DB ERROR', e)
             return None
 
 
@@ -176,6 +170,7 @@ def update_session(session_id: str, messages: Optional[List[Dict]] = None) -> bo
                 if not chat:
                     chat = Chat(
                         user_id=db_session.user_id,
+                        id=str(uuid.uuid4()),
                         session_id=session_id,
                         title=f"Chat {session_id[:8]}",
                         created_at=now
@@ -184,15 +179,17 @@ def update_session(session_id: str, messages: Optional[List[Dict]] = None) -> bo
                     db.flush()
                 
                 # Clear existing messages
-                db.query(Message).filter(Message.chat_id == chat.id).delete()
+                # db.query(Message).filter(Message.chat_id == chat.id).delete()
                 
                 # Add new messages
                 for msg in messages:
                     db_message = Message(
+                        id=str(uuid.uuid4()),
                         chat_id=chat.id,
+                        session_id=session_id,
                         role=msg["role"],
                         content=msg["content"],
-                        created_at=now
+                        created_at=msg.get("created_at", now)
                     )
                     db.add(db_message)
                 

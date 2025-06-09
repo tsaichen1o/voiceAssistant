@@ -73,7 +73,7 @@ async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, 
         session_id=session_id,
         role="assistant",
         content=response.text,
-        timestamp=datetime.now(UTC).isoformat()
+        created_at=datetime.now(UTC).isoformat()
     )
     
     # Update session with message history - include user context
@@ -95,7 +95,6 @@ async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, 
             completion_tokens_details=None,
             prompt_tokens_details=None
         )
-    # 💢 the schema is not correct
     
     # Return the response
     return ChatResponse(
@@ -126,7 +125,7 @@ async def get_rag_chat_response(request: RAGRequest) -> ChatResponse:
         session_id=session_id,
         role="assistant",
         content="RAG-enhanced chat is coming soon. This feature will allow the model to reference external documents.",
-        timestamp=datetime.now(UTC).isoformat()
+        created_at=datetime.now(UTC).isoformat()
     )
     
     return ChatResponse(

@@ -3,7 +3,7 @@ export interface ChatMessage {
   session_id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  timestamp: string;
+  created_at: string;
 }
 
 export interface ChatSession {
