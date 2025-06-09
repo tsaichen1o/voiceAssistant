@@ -65,7 +65,7 @@ export default function LandingPage() {
       <div className={`flex gap-4 mt-6 transition-opacity duration-700 ${showButton ? 'opacity-100' : 'opacity-0'}`}>
         <button
           onClick={handleStartNow}
-          className="px-4 py-2 bg-[#2F70B3] text-white rounded-md text-sm sm:text-base md:text-lg"
+          className="px-4 py-2 bg-[#2F70B3] text-white rounded-md text-sm sm:text-base md:text-lg hover:bg-[#2F70B3]/80 transition-colors duration-300 cursor-pointer"
           disabled={creatingChatSession}
         >
           {creatingChatSession ? 'Creating...' : 'Start Now'}
@@ -73,7 +73,7 @@ export default function LandingPage() {
         {!user && (
           <Link
             href="/login"
-            className="px-4 py-2 border border-[#2F70B3] text-[#2F70B3] rounded-md text-sm sm:text-base md:text-lg bg-white hover:bg-[#f1f7ff]"
+            className="px-4 py-2 border border-[#2F70B3] text-[#2F70B3] rounded-md text-sm sm:text-base md:text-lg bg-white hover:bg-[#f1f7ff] cursor-pointer"
           >
             Login
           </Link>
