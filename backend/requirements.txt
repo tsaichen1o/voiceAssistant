@@ -24,3 +24,8 @@ httpx>=0.25.0
 # Testing
 pytest>=7.4.0
 requests>=2.31.0
+
+# Other
+protobuf>=6.31.1
+PyJWT>=2.10.1
+gunicorn>=23.0.0,<24.0.0
