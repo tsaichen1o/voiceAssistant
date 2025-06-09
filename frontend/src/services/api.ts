@@ -4,6 +4,10 @@ import { ChatMessage } from '@/types/chat';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+export interface StreamInitiationResponse {
+  stream_id: string;
+  session_id: string;
+}
 
 // ------------------ Auth API ------------------
 export async function getAccessToken() {
@@ -73,10 +77,18 @@ export async function deleteChatSession(chatSessionId: string) {
 
 
 // ------------------ Chat Message API ------------------
+/**
+ * Send a message to the backend to initiate a chat response.
+ * Based on the stream parameter, the backend will decide whether to return a complete answer or start a stream.
+ * We always request streaming output.
+ * @param messages Chat history messages
+ * @param chatSessionId Current session ID
+ * @returns An object containing stream_id, used to establish an EventSource connection later
+ */
 export async function sendMessage(
   messages: ChatMessage[],
   chatSessionId?: string
-) {
+): Promise<StreamInitiationResponse> {
   const token = await getAccessToken();
 
   const res = await fetch(`${API_URL}/api/chat`, {
@@ -86,19 +98,44 @@ export async function sendMessage(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      messages,
+      messages: messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        created_at: m.created_at,
+      })),
       session_id: chatSessionId,
       temperature: 0.7,
       max_tokens: 1000,
-      stream: false,
+      stream: true,
     }),
   });
 
   if (!res.ok) {
     const errText = await res.text();
     console.error('API ERROR:', res.status, errText);
-    throw new Error('Failed to send message');
+    throw new Error('Failed to initiate chat stream');
   }
   
+  return res.json();
+}
+
+export async function saveChatHistory(messages: ChatMessage[], sessionId: string) {
+  const token = await getAccessToken();
+
+  const res = await fetch(`${API_URL}/api/sessions/${sessionId}/messages`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ messages }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("API Error on save:", errText);
+    throw new Error('Failed to save chat history');
+  }
+
   return res.json();
 }

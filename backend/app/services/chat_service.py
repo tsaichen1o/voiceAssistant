@@ -1,15 +1,59 @@
-from typing import Dict, Any, Optional
+# -*- coding: utf-8 -*-
+
+
+from typing import Dict, Any, Optional, AsyncGenerator
 from app.utils.gemini_client import generate_chat_completion
 from app.models.schemas import Message, ChatRequest, ChatResponse, RAGRequest, Usage, CompletionTokensDetails, PromptTokensDetails
 from app.config import settings
 import google.generativeai as genai
-from app.services.session_service import create_session, get_session, update_session
+from app.services.session_service import create_session, get_session, update_session, redis_client
 from datetime import datetime, UTC
 import uuid
+import asyncio
 
 
 # Configure Gemini client
 genai.configure(api_key=settings.GEMINI_API_KEY)
+
+async def stream_chat_response(messages: list, stream_id: str) -> AsyncGenerator[str, None]:
+    """
+    An async generator that streams responses from the Gemini model.
+    Args:
+        messages: The list of messages to send to the model
+        stream_id: The ID of the stream to clean up
+    """
+    try:
+        model = genai.GenerativeModel(settings.GEMINI_MODEL)
+
+        conversation_text = ""
+        for message in messages:
+            if message['role'] == "user":
+                conversation_text += f"User: {message['content']}\n"
+            elif message['role'] == "assistant":
+                conversation_text += f"Assistant: {message['content']}\n"
+
+        response_stream = model.generate_content(
+            conversation_text,
+            stream=True,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.7,
+                max_output_tokens=1000,
+            )
+        )
+
+        for chunk in response_stream:
+            if chunk.text:
+                yield f"data: {chunk.text}\n\n"
+                await asyncio.sleep(0.02)
+
+    except Exception as e:
+        print(f"Error during stream generation: {e}")
+        yield f"data: [error] An error occurred while generating the response.\n\n"
+    finally:
+        # Clean up the Redis key after the stream is complete
+        redis_client.delete(f"stream_request:{stream_id}")
+        print(f"Cleaned up Redis key for stream: {stream_id}")
+        yield "data: [done]\n\n"
 
 
 async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, Any]] = None) -> ChatResponse:
@@ -23,7 +67,6 @@ async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, 
     Returns:
         ChatResponse: The model's response
     """
-    # Handle session management with user context
     session_id = request.session_id
     user_id = user_info.get("user_id") if user_info else None
     

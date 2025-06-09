@@ -12,7 +12,6 @@ router = APIRouter(
     tags=["sessions"],
 )
 
-
 @router.get("", response_model=List[SessionInfo])
 async def get_all_sessions_endpoint(user: Dict[str, Any] = Depends(verify_supabase_token)):
     """
@@ -125,3 +124,28 @@ async def get_cache_statistics():
             status_code=500, 
             detail=f"Failed to retrieve cache stats: {str(e)}"
         ) 
+        
+        
+@router.post("/{session_id}/messages")
+async def save_session_messages(
+    session_id: str, 
+    data: dict,
+    user: dict = Depends(verify_supabase_token)
+):
+    """
+    Receives the complete chat history from the frontend and saves it.
+    This is called after a stream is complete.
+    """
+    messages = data.get("messages", [])
+    user_id = user.get("sub")
+
+    session = get_session(session_id, user_id=user_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found or access denied")
+
+    success = update_session(session_id, messages, user_id=user_id)
+
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update session in database")
+        
+    return {"message": "Session history saved successfully"}

@@ -4,6 +4,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   created_at: string;
+  isStreaming?: boolean;
+  streamUrl?: string;
 }
 
 export interface ChatSession {

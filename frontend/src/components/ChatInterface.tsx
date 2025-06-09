@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import ChatInput from './ChatInput';
 import { GoSidebarExpand } from 'react-icons/go';
 import { FaMoon, FaSun } from 'react-icons/fa';
@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
 import '../i18n';
 import { FaPersonCircleQuestion, FaXmark } from "react-icons/fa6";
-import { sendMessage, getChatSessionHistory } from '@/services/api';
+import { sendMessage, getChatSessionHistory, saveChatHistory } from '@/services/api';
 
 
 interface ChatInterfaceProps {
@@ -21,11 +21,9 @@ interface ChatInterfaceProps {
 export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showFAQModal, setShowFAQModal] = useState(false);
   const [sessionTitle, setSessionTitle] = useState<string>('');
-
   const { t } = useTranslation();
   const rawFAQS = t('faq', { returnObjects: true });
   const FAQS: string[] = Array.isArray(rawFAQS) ? rawFAQS : [];
@@ -51,49 +49,53 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
 
-    const now = new Date().toISOString();
-
     const userMessage: ChatMessage = {
       id: uuidv4(),
       session_id: chatSessionId,
       role: 'user',
       content,
-      created_at: now,
+      created_at: new Date().toISOString(),
     };
-    setMessages(prev => [...prev, userMessage]);
-
-    setIsTyping(true);
-
+    
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+  
     try {
-
-      const response = await sendMessage(
-        [...messages, userMessage].map(msg => ({
-          id: uuidv4(),
-          session_id: chatSessionId,
-          role: msg.role,
-          content: msg.content,
-          created_at: msg.created_at,
-        })),
+      // Note: We pass updatedMessages to ensure the backend has the complete conversation history
+      const streamInitResponse = await sendMessage(
+        updatedMessages,
         chatSessionId
       );
+      const streamId = streamInitResponse.stream_id;
+  
+      if (!streamId) {
+        throw new Error("Backend did not return a stream_id");
+      }
   
       const assistantMessage: ChatMessage = {
         id: uuidv4(),
         session_id: chatSessionId,
         role: 'assistant',
-        content: response.message.content,
-        created_at: response.message.created_at || now,
+        content: '',
+        created_at: new Date().toISOString(),
+        isStreaming: true,
+        streamUrl: `${process.env.NEXT_PUBLIC_API_URL}/api/chat/stream/${streamId}`
       };
+  
       setMessages(prev => [...prev, assistantMessage]);
+  
     } catch (error) {
       console.error('Failed to send message:', error);
-    } finally {
-      setIsTyping(false);
+      const errorMessage: ChatMessage = {
+        id: uuidv4(),
+        session_id: chatSessionId,
+        role: 'assistant',
+        content: "Sorry, I encountered an error. Please try again.",
+        created_at: new Date().toISOString(),
+        isStreaming: false,
+      };
+      setMessages(prev => [...prev, errorMessage]);
     }
-  };
-
-  const handleTypingComplete = () => {
-    setIsTyping(false);
   };
 
   const handleTitleUpdate = (title: string) => {
@@ -137,6 +139,25 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
       loadSessionHistory();
     }
   }, [chatSessionId]);
+
+  const handleStreamingComplete = useCallback(async (completedMessage: ChatMessage) => {
+    let finalMessages: ChatMessage[] = [];
+
+    setMessages(prevMessages => {
+      finalMessages = prevMessages.map(msg => 
+          msg.id === completedMessage.id ? completedMessage : msg
+      );
+      return finalMessages;
+  });
+  
+    try {
+      // Save the complete conversation history to the backend
+      await saveChatHistory(finalMessages, chatSessionId);
+      console.log("Session history saved successfully.");
+    } catch (error) {
+      console.error("Failed to save session history:", error);
+    }
+  }, [chatSessionId]); 
 
   return (
     <div className={`flex flex-col h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900' : 'bg-[#F6F6F6]'}`}>
@@ -201,8 +222,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
               <>
                 <ChatMessagesList
                   messages={messages}
-                  isTyping={isTyping}
-                  onTypingComplete={handleTypingComplete}
+                  onStreamingComplete={handleStreamingComplete}
                   isDarkMode={isDarkMode}
                 />
                 <button
@@ -231,8 +251,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
         <div className={`transition-colors duration-300 ${isDarkMode ? 'bg-gray-800 border-t border-gray-700' : 'bg-white border-t border-gray-200'}`}>
           <ChatInput 
             onSend={handleSendMessage} 
-            isDarkMode={isDarkMode} 
-            chatSessionId={chatSessionId}
+            isDarkMode={isDarkMode}
             onTitleUpdate={handleTitleUpdate}
           />
         </div>

@@ -89,17 +89,18 @@ def get_session(session_id: str, user_id: Optional[str] = None) -> Optional[Dict
     """
 
     cached_session = redis_client.get(f"session:{session_id}")
-    if cached_session:
-        session_data = json.loads(cached_session)
-        if not session_data.get("messages"):
-            print('Redis cache messages is empty, fallback to DB')
-        else:
-            if user_id and session_data.get("user_id") != user_id:
-                return None
-            redis_client.expire(f"session:{session_id}", ACTIVE_SESSION_EXPIRY)
-            return session_data
-    else:
-        print('Redis cache is empty, fallback to DB')
+    # TODO: check if this is correct
+    # if cached_session:
+    #     session_data = json.loads(cached_session)
+    #     if not session_data.get("messages"):
+    #         print('Redis cache messages is empty, fallback to DB')
+    #     else:
+    #         if user_id and session_data.get("user_id") != user_id:
+    #             return None
+    #         redis_client.expire(f"session:{session_id}", ACTIVE_SESSION_EXPIRY)
+    #         return session_data
+    # else:
+    #     print('Redis cache is empty, fallback to DB')
 
     with get_db_session() as db:
         try:
@@ -142,20 +143,22 @@ def get_session(session_id: str, user_id: Optional[str] = None) -> Optional[Dict
             return None
 
 
-def update_session(session_id: str, messages: Optional[List[Dict]] = None) -> bool:
+def update_session(session_id: str, messages: Optional[List[Dict]] = None, user_id: Optional[str] = None) -> bool:
     """
     Update session in both PostgreSQL and Redis.
-    
-    Strategy:
-    1. Update PostgreSQL (permanent record)
-    2. Update Redis cache (fast access)
+    Now includes user_id for access control.
     """
     now = datetime.now(timezone.utc)
     
     # 1. Update PostgreSQL
     with get_db_session() as db:
         try:
-            db_session = db.query(Session).filter(Session.id == session_id).first()
+            # Add user_id to the query for security
+            query = db.query(Session).filter(Session.id == session_id)
+            if user_id:
+                query = query.filter(Session.user_id == user_id)
+            
+            db_session = query.first()
             
             if not db_session:
                 return False
@@ -164,7 +167,7 @@ def update_session(session_id: str, messages: Optional[List[Dict]] = None) -> bo
             db_session.last_active = now
             
             if messages:
-                # Get or create chat
+                # This logic to get/create a chat and add messages is correct
                 chat = db.query(Chat).filter(Chat.session_id == session_id).first()
                 
                 if not chat:
@@ -178,18 +181,25 @@ def update_session(session_id: str, messages: Optional[List[Dict]] = None) -> bo
                     db.add(chat)
                     db.flush()
                 
-                # Clear existing messages
-                # db.query(Message).filter(Message.chat_id == chat.id).delete()
-                
+                # To prevent duplicates, first delete existing messages for the chat
+                db.query(Message).filter(Message.chat_id == chat.id).delete(synchronize_session=False)
+
                 # Add new messages
                 for msg in messages:
+                    # Parse timestamp string back to datetime object if it's a string
+                    created_at_val = msg.get("timestamp") or msg.get("created_at")
+                    if isinstance(created_at_val, str):
+                        created_at_dt = datetime.fromisoformat(created_at_val.replace("Z", "+00:00"))
+                    else:
+                        created_at_dt = created_at_val or now
+
                     db_message = Message(
-                        id=str(uuid.uuid4()),
+                        id=msg.get("id", str(uuid.uuid4())),
                         chat_id=chat.id,
                         session_id=session_id,
                         role=msg["role"],
                         content=msg["content"],
-                        created_at=msg.get("created_at", now)
+                        created_at=created_at_dt
                     )
                     db.add(db_message)
                 
@@ -208,6 +218,7 @@ def update_session(session_id: str, messages: Optional[List[Dict]] = None) -> bo
             
         except Exception as e:
             db.rollback()
+            print(f"Error updating session in DB: {e}")
             return False
     
     # 2. Update Redis cache
@@ -225,8 +236,8 @@ def update_session(session_id: str, messages: Optional[List[Dict]] = None) -> bo
                 ACTIVE_SESSION_EXPIRY,
                 json.dumps(session_data)
             )
-    except Exception:
-        # Redis update failure is not critical
+    except Exception as e:
+        print(f"Error updating Redis cache: {e}")
         pass
     
     return True

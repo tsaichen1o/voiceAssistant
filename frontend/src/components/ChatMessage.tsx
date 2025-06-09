@@ -6,13 +6,21 @@ import TypewriterText from './TypewriterText';
 
 interface ChatMessageProps {
     message: ChatMessageType;
-    isTyping?: boolean;
-    onTypingComplete?: () => void;
+    onStreamingComplete?: (finalMessage: ChatMessageType) => void;
     isDarkMode: boolean;
 }
 
-export default function ChatMessage({ message, isTyping, onTypingComplete, isDarkMode }: ChatMessageProps) {
+export default function ChatMessage({ message, onStreamingComplete, isDarkMode }: ChatMessageProps) {
     const isUser = message.role === 'user';
+
+    // When the SSE data stream is complete, a callback function can be triggered
+    // NOTE: this step is optional, but it helps to update the parent's message state after the stream ends
+    const handleComplete = (finalContent: string) => {
+        if (onStreamingComplete) {
+            const finalMessage = { ...message, content: finalContent, isStreaming: false };
+            onStreamingComplete(finalMessage);
+        }
+    };
 
     return (
         <div className={`flex w-full my-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -34,8 +42,11 @@ export default function ChatMessage({ message, isTyping, onTypingComplete, isDar
                     }`
                 }
             >
-                {!isUser && isTyping ? (
-                    <TypewriterText text={message.content} onComplete={onTypingComplete} />
+                {!isUser && message.isStreaming && message.streamUrl ? (
+                    <TypewriterText 
+                        streamUrl={message.streamUrl} 
+                        onComplete={handleComplete}
+                    />
                 ) : (
                     message.content
                 )}

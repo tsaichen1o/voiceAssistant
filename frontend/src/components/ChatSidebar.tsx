@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { IoCloseSharp, IoTrashOutline } from 'react-icons/io5';
 import { useAuth } from '@/context/AuthProvider';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createChatSession, deleteChatSession, getChatSessions } from '@/services/api';
 
+// TODO: get all sessions from the backend
 
 interface ChatSidebarProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode }: ChatSidebar
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     if (!userId) return;
     try {
       const response = await getChatSessions();
@@ -46,7 +47,7 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode }: ChatSidebar
     } catch (error) {
       console.error('Failed to fetch sessions:', error);
     }
-  };
+  }, [userId]);
 
   const handleCreateSession = async () => {
     if (!userId) return;
@@ -78,7 +79,7 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode }: ChatSidebar
     if (userId) {
       fetchSessions();
     }
-  }, [userId]);
+  }, [userId, fetchSessions]);
 
   return (
     <>

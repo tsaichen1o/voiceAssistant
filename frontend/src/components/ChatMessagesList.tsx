@@ -8,19 +8,18 @@ import { IoIosArrowDown } from 'react-icons/io';
 
 interface ChatMessagesListProps {
     messages: ChatMessageType[];
-    isTyping: boolean;
-    onTypingComplete: () => void;
+    onStreamingComplete: (finalMessage: ChatMessageType) => void;
     isDarkMode: boolean;
 }
 
-export default function ChatMessagesList({ messages, isTyping, onTypingComplete, isDarkMode }: ChatMessagesListProps) {
+export default function ChatMessagesList({ messages, onStreamingComplete, isDarkMode }: ChatMessagesListProps) {
     const bottomRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [showScrollButton, setShowScrollButton] = useState(false);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isTyping]);
+    }, [messages]);
 
     useEffect(() => {
         const container = scrollContainerRef.current;
@@ -37,7 +36,7 @@ export default function ChatMessagesList({ messages, isTyping, onTypingComplete,
         return () => {
             container.removeEventListener('scroll', handleScroll);
         };
-    }, [messages, isTyping]);
+    }, [messages]);
 
     const scrollToBottom = () => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -49,12 +48,11 @@ export default function ChatMessagesList({ messages, isTyping, onTypingComplete,
                 ref={scrollContainerRef}
                 className={`flex flex-col gap-2 p-4 h-full overflow-y-auto scroll-smooth ${isDarkMode ? 'text-gray-200' : ''}`}
             >
-                {messages.map((message, idx) => (
+                {messages.map((message) => (
                     <ChatMessage
                         key={message.id}
                         message={message}
-                        isTyping={message.role === 'assistant' && idx === messages.length - 1 && isTyping}
-                        onTypingComplete={onTypingComplete}
+                        onStreamingComplete={onStreamingComplete}
                         isDarkMode={isDarkMode}
                     />
                 ))}
