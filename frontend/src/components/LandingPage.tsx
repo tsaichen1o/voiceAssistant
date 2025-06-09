@@ -10,7 +10,8 @@ export default function LandingPage() {
   const [showLogo, setShowLogo] = useState(false);
   const [showText, setShowText] = useState(false);
   const [showButton, setShowButton] = useState(false);
-  const [chatSessionId, setChatSessionId] = useState<string | null>(null);
+  // TODO: add chatSessionId to state
+  // const [chatSessionId, setChatSessionId] = useState<string | null>(null);
   const [creatingChatSession, setCreatingChatSession] = useState(false);
 
   const { user } = useAuth();
@@ -20,7 +21,7 @@ export default function LandingPage() {
     setCreatingChatSession(true);
     try {
       const session = await createChatSession();
-      setChatSessionId(session.session_id);
+      // setChatSessionId(session.session_id);
       window.location.href = `/chat/${userId}/${session.session_id}`;
     } catch {
       alert('Failed to create chat session, please try again later');
