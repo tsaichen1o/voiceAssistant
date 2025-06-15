@@ -51,6 +51,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
     localStorage.setItem('theme', newTheme ? 'dark' : 'light');
   };
 
+  // TODO: handle error on sending the first message
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
 
@@ -220,9 +221,15 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
           >
             <GoSidebarExpand size={24} />
           </button>
-          <p className={`text-sm font-medium w-full text-center ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-            {isLoadingHistory ? 'Loading...' : sessionTitle}
-          </p>
+          <div className={`
+            text-lg font-bold cursor-pointer
+            transition-all duration-300 hover:scale-105
+            ${isDarkMode ? 'text-[#3775B6] hover:text-[#4a8ac9]' : 'text-[#3775B6] hover:text-[#4a8ac9]'}
+            w-full text-center
+            md:w-auto md:text-left md:ml-[14.5rem]
+          `}>
+            go42TUM
+          </div>
           <button
             onClick={toggleDarkMode}
             className={`p-2 rounded-full absolute right-4 transition-colors duration-200 cursor-pointer ${isDarkMode ? 'text-yellow-400 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100'}`}

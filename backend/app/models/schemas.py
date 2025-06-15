@@ -6,7 +6,8 @@ from datetime import datetime
 class Message(BaseModel):
     """Chat message model."""
     id: Optional[str] = None                      
-    session_id: Optional[str] = None              
+    session_id: Optional[str] = None
+    chat_id: Optional[str] = None
     role: Literal["system", "user", "assistant"]
     content: str
     created_at: datetime
@@ -32,6 +33,7 @@ class Usage(BaseModel):
     completion_tokens: int
     prompt_tokens: int
     total_tokens: int
+    # TODO: Check if this is needed
     completion_tokens_details: Optional[CompletionTokensDetails] = None
     prompt_tokens_details: Optional[PromptTokensDetails] = None
 

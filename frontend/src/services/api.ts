@@ -74,6 +74,7 @@ export async function getChatSessionHistory(chatSessionId: string): Promise<Chat
 }
 
 
+// TODO: error handling
 export async function deleteChatSession(chatSessionId: string) {
   const token = await getAccessToken();
   const res = await fetch(`${API_URL}/api/sessions/${chatSessionId}`, {
