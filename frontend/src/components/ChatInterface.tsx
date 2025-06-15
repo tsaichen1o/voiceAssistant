@@ -25,7 +25,6 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showFAQModal, setShowFAQModal] = useState(false);
-  const [sessionTitle, setSessionTitle] = useState<string>('');
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const { user } = useAuth();
   const { t } = useTranslation();
@@ -151,7 +150,6 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
     const loadSessionHistory = async () => {
       if (chatSessionId === 'new') {
         setMessages([]);
-        setSessionTitle('New Chat');
         setIsLoadingHistory(false);
         return;
       }
@@ -166,22 +164,9 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
       try {
         const history = await getChatSessionHistory(chatSessionId);
 
-        if (history.title && history.title !== 'New Chat') {
-          setSessionTitle(history.title);
-        } else {
-          const firstUserMessage = history.messages?.find((msg: ChatMessage) => msg.role === 'user');
-          if (firstUserMessage) {
-            const title = firstUserMessage.content.slice(0, 30) + (firstUserMessage.content.length > 30 ? '...' : '');
-            setSessionTitle(title);
-          } else {
-            setSessionTitle('New Chat');
-          }
-        }
-
         setMessages(history.messages || []);
       } catch (error) {
         console.error('Failed to load session history:', error);
-        setSessionTitle('Chat Not Found');
         setMessages([]);
       } finally {
         setIsLoadingHistory(false);
