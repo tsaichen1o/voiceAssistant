@@ -13,10 +13,9 @@ import VoiceAssistantOverlay from './VoiceAssistantOverlay';
 interface ChatInputProps {
   onSend: (content: string) => void;
   isDarkMode: boolean;
-  onTitleUpdate?: (title: string) => void;
 }
 
-export default function ChatInput({ onSend, isDarkMode, onTitleUpdate }: ChatInputProps) {
+export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [preview, setPreview] = useState<string[]>([]);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -56,12 +55,6 @@ export default function ChatInput({ onSend, isDarkMode, onTitleUpdate }: ChatInp
     setIsSending(true);
     try {
       onSend(input);
-
-      if (onTitleUpdate) {
-        const title = input.slice(0, 50);
-        onTitleUpdate(title + (input.length > 50 ? '...' : ''));
-      }
-
       setInput('');
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';

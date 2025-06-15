@@ -1,5 +1,4 @@
 import redis
-import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
@@ -26,16 +25,16 @@ ACTIVE_SESSION_EXPIRY = 60 * 60 * 2
 
 def get_db_session():
     """Get database session."""
-    return SessionLocal()
+    db = SessionLocal()
+    try:
+        return db
+    finally:
+        db.close()
 
 
 def create_session(user_id: Optional[str] = None) -> str:
     """
     Create new session in both PostgreSQL and Redis.
-    
-    Strategy:
-    1. Create permanent record in PostgreSQL
-    2. Cache active session in Redis for fast access
     """
     session_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
@@ -43,204 +42,306 @@ def create_session(user_id: Optional[str] = None) -> str:
     # 1. Store in PostgreSQL (permanent)
     with get_db_session() as db:
         try:
+            # When a session is created, we also create its primary Chat counterpart
             db_session = Session(
                 id=session_id,
                 user_id=user_id,
-                session_key=session_id,
                 created_at=now,
                 last_active=now,
                 is_active=True
             )
             db.add(db_session)
+            
+            # Create the initial Chat associated with this Session
+            initial_chat = Chat(
+                id=str(uuid.uuid4()),
+                user_id=user_id,
+                session_id=session_id,
+                title="New Chat",
+                created_at=now,
+                updated_at=now
+            )
+            db.add(initial_chat)
+            
             db.commit()
+            
+            return session_id
         except Exception as e:
             db.rollback()
             raise e
     
+    # TODO: check if Redis is needed
     # 2. Cache in Redis (fast access)
-    session_data = {
-        "session_id": session_id,
-        "created_at": now.isoformat(),
-        "last_active": now.isoformat(),
-        "user_id": user_id,
-        "messages": []
-    }
+    # session_data = {
+    #     "session_id": session_id,
+    #     "created_at": now.isoformat(),
+    #     "last_active": now.isoformat(),
+    #     "user_id": str(user_id) if user_id else None,
+    #     "title": "New Chat",
+    #     "messages": []
+    # }
     
-    redis_client.setex(
-        f"session:{session_id}",
-        ACTIVE_SESSION_EXPIRY,
-        json.dumps(session_data)
-    )
+    # redis_client.setex(
+    #     f"session:{session_id}",
+    #     ACTIVE_SESSION_EXPIRY,
+    #     json.dumps(session_data)
+    # )
     
-    return session_id
+    # return session_id
 
+
+"""
 def get_session(session_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """
-    Get session with cache-first strategy.
     
-    Strategy:
-    1. Try Redis cache first (fast)
-    2. Fall back to PostgreSQL if not in cache
-    3. Re-cache in Redis if found in PostgreSQL
+    # Get session with cache-first strategy.
     
-    Args:
-        session_id: The session ID to retrieve
-        user_id: Optional user ID for access control
-    """
-
+    # 1. Try Redis cache first
     cached_session = redis_client.get(f"session:{session_id}")
-    # TODO: check if this is correct
-    # if cached_session:
-    #     session_data = json.loads(cached_session)
-    #     if not session_data.get("messages"):
-    #         print('Redis cache messages is empty, fallback to DB')
-    #     else:
-    #         if user_id and session_data.get("user_id") != user_id:
-    #             return None
-    #         redis_client.expire(f"session:{session_id}", ACTIVE_SESSION_EXPIRY)
-    #         return session_data
-    # else:
-    #     print('Redis cache is empty, fallback to DB')
-
+    if cached_session:
+        session_data = json.loads(cached_session)
+        # Verify user access if user_id is provided
+        if user_id and session_data.get("user_id") != user_id:
+            return None
+        # Extend cache TTL for active sessions
+        redis_client.expire(f"session:{session_id}", ACTIVE_SESSION_EXPIRY)
+        return session_data
+    
+    # 2. Fall back to PostgreSQL if not in cache
     with get_db_session() as db:
         try:
             query = db.query(Session).filter(Session.id == session_id)
             if user_id:
                 query = query.filter(Session.user_id == user_id)
             db_session = query.first()
+
             if not db_session or not db_session.is_active:
                 return None
 
-            chats = db.query(Chat).filter(Chat.session_id == session_id).all()
-            print('chats', chats)
+            # In our 3-tier model, a session contains chats, and chats contain messages
+            # For simplicity, we assume one primary chat per session for now.
+            chat = db.query(Chat).filter(Chat.session_id == session_id).first()
             messages = []
-            for chat in chats:
+            title = chat.title if chat else "New Chat"
+
+            if chat:
                 chat_messages = db.query(Message).filter(Message.chat_id == chat.id).order_by(Message.created_at).all()
                 for msg in chat_messages:
                     messages.append({
                         "id": str(msg.id),
-                        "session_id": session_id,
+                        "session_id": str(msg.session_id),
                         "role": msg.role,
                         "content": msg.content,
                         "chat_id": str(msg.chat_id),
-                        "created_at": msg.created_at.isoformat() if isinstance(msg.created_at, datetime) else str(msg.created_at)
+                        "created_at": msg.created_at.isoformat()
                     })
+
             session_data = {
-                "session_id": session_id,
+                "session_id": str(db_session.id),
                 "created_at": db_session.created_at.isoformat(),
                 "last_active": db_session.last_active.isoformat(),
                 "user_id": str(db_session.user_id) if db_session.user_id else None,
+                "title": title,
                 "messages": messages
             }
+            
+            # 3. Re-cache in Redis
+            # We need to handle the case where `messages` contains datetime objects
+            def json_converter(o):
+                if isinstance(o, datetime):
+                    return o.isoformat()
             redis_client.setex(
                 f"session:{session_id}",
                 ACTIVE_SESSION_EXPIRY,
-                json.dumps(session_data)
+                json.dumps(session_data, default=json_converter)
             )
             return session_data
         except Exception as e:
-            print('DB ERROR', e)
+            print(f'DB ERROR in get_session: {e}')
             return None
+"""
 
 
 def update_session(session_id: str, messages: Optional[List[Dict]] = None, user_id: Optional[str] = None) -> bool:
     """
-    Update session in both PostgreSQL and Redis.
-    Now includes user_id for access control.
+    Update session, chat title, and all messages in PostgreSQL.
     """
     now = datetime.now(timezone.utc)
-    
-    # 1. Update PostgreSQL
     with get_db_session() as db:
         try:
-            # Add user_id to the query for security
             query = db.query(Session).filter(Session.id == session_id)
-            if user_id:
-                query = query.filter(Session.user_id == user_id)
-            
+            if user_id: query = query.filter(Session.user_id == user_id)
             db_session = query.first()
             
-            if not db_session:
-                return False
-            
-            # Update last_active time
+            if not db_session: return False
             db_session.last_active = now
             
             if messages:
-                # This logic to get/create a chat and add messages is correct
-                chat = db.query(Chat).filter(Chat.session_id == session_id).first()
-                
+                chat = db.query(Chat).filter(Chat.session_id == db_session.id).first()
                 if not chat:
-                    chat = Chat(
-                        user_id=db_session.user_id,
-                        id=str(uuid.uuid4()),
-                        session_id=session_id,
-                        title=f"Chat {session_id[:8]}",
-                        created_at=now
-                    )
+                    chat = Chat(id=str(uuid.uuid4()), user_id=db_session.user_id, session_id=db_session.id, title="New Chat", created_at=now)
                     db.add(chat)
                     db.flush()
-                
-                # To prevent duplicates, first delete existing messages for the chat
+
+                # To ensure consistency, delete all old messages and add the new complete list
                 db.query(Message).filter(Message.chat_id == chat.id).delete(synchronize_session=False)
 
-                # Add new messages
-                for msg in messages:
-                    # Parse timestamp string back to datetime object if it's a string
-                    created_at_val = msg.get("timestamp") or msg.get("created_at")
-                    if isinstance(created_at_val, str):
-                        created_at_dt = datetime.fromisoformat(created_at_val.replace("Z", "+00:00"))
-                    else:
-                        created_at_dt = created_at_val or now
+                for msg_data in messages:
+                    created_at_str = msg_data.get("created_at")
+                    created_at_dt = datetime.fromisoformat(created_at_str.replace("Z", "+00:00")) if isinstance(created_at_str, str) else now
 
                     db_message = Message(
-                        id=msg.get("id", str(uuid.uuid4())),
+                        id=msg_data.get("id", str(uuid.uuid4())),
                         chat_id=chat.id,
-                        session_id=session_id,
-                        role=msg["role"],
-                        content=msg["content"],
+                        session_id=db_session.id,
+                        role=msg_data["role"],
+                        content=msg_data["content"],
                         created_at=created_at_dt
                     )
                     db.add(db_message)
                 
-                # Update chat title from first user message
-                for msg in messages:
-                    if msg["role"] == "user":
-                        title = msg["content"][:50]
-                        if len(msg["content"]) > 50:
-                            title += "..."
-                        chat.title = title
-                        break
-                
+                # Update chat title
+                user_messages = [m for m in messages if m["role"] == "user"]
+                if user_messages:
+                    chat.title = user_messages[0]["content"][:50] + ("..." if len(user_messages[0]["content"]) > 50 else "")
                 chat.updated_at = now
             
             db.commit()
-            
+            return True
         except Exception as e:
             db.rollback()
             print(f"Error updating session in DB: {e}")
             return False
+        
+
+def get_session(session_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Get a session and all its related messages directly from PostgreSQL.
+    """
+    with get_db_session() as db:
+        try:
+            # 1. Find the session and verify ownership
+            query = db.query(Session).filter(Session.id == session_id)
+            if user_id:
+                query = query.filter(Session.user_id == user_id)
+            db_session = query.first()
+
+            if not db_session or not db_session.is_active:
+                return None
+
+            # 2. Find the associated chat to get the title
+            chat = db.query(Chat).filter(Chat.session_id == session_id).first()
+            title = chat.title if chat else "New Chat"
+            messages = []
+
+            # 3. If a chat exists, get all its messages
+            if chat:
+                chat_messages = db.query(Message).filter(Message.chat_id == chat.id).order_by(Message.created_at).all()
+                for msg in chat_messages:
+                    messages.append({
+                        "id": str(msg.id),
+                        "session_id": str(msg.session_id),
+                        "role": msg.role,
+                        "content": msg.content,
+                        "created_at": msg.created_at.isoformat()
+                    })
+
+            # 4. Assemble and return the complete session data
+            session_data = {
+                "session_id": str(db_session.id),
+                "created_at": db_session.created_at.isoformat(),
+                "last_active": db_session.last_active.isoformat(),
+                "user_id": str(db_session.user_id) if db_session.user_id else None,
+                "title": title,
+                "messages": messages
+            }
+            return session_data
+        except Exception as e:
+            print(f'DB ERROR in get_session: {e}')
+            return None
+
+
+"""
+def update_session(session_id: str, messages: Optional[List[Dict]] = None, user_id: Optional[str] = None) -> bool:
     
-    # 2. Update Redis cache
+    # Update session and its related Chat and Messages in PostgreSQL and Redis.
+    
+    now = datetime.now(timezone.utc)
+    db = get_db_session()
     try:
-        cached_session = redis_client.get(f"session:{session_id}")
-        if cached_session:
-            session_data = json.loads(cached_session)
-            session_data["last_active"] = now.isoformat()
+        # 1. Get the main session object, ensuring ownership
+        query = db.query(Session).filter(Session.id == session_id)
+        if user_id:
+            query = query.filter(Session.user_id == user_id)
+        db_session = query.first()
+        
+        if not db_session:
+            return False
+        
+        db_session.last_active = now
+        
+        if messages:
+            # 2. Get or create the associated Chat record
+            # In this logic, we assume one primary Chat per Session
+            chat = db.query(Chat).filter(Chat.session_id == db_session.id).first()
             
-            if messages:
-                session_data["messages"] = messages
+            if not chat:
+                # This case might happen if creation failed before, let's create it now
+                chat = Chat(
+                    id=str(uuid.uuid4()),
+                    user_id=db_session.user_id,
+                    session_id=db_session.id,
+                    title="New Chat",
+                    created_at=now
+                )
+                db.add(chat)
+                db.flush() # Flush to get the chat.id before creating messages
+
+            # 3. To prevent duplicates, first delete all existing messages for this chat
+            db.query(Message).filter(Message.chat_id == chat.id).delete(synchronize_session=False)
+
+            # 4. Add the new, complete list of messages
+            for msg_data in messages:
+                created_at_str = msg_data.get("created_at")
+                if isinstance(created_at_str, str):
+                    created_at_dt = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                else:
+                    created_at_dt = now
+
+                db_message = Message(
+                    id=msg_data.get("id", str(uuid.uuid4())),
+                    chat_id=chat.id,
+                    session_id=db_session.id,
+                    role=msg_data["role"],
+                    content=msg_data["content"],
+                    created_at=created_at_dt
+                )
+                db.add(db_message)
             
-            redis_client.setex(
-                f"session:{session_id}",
-                ACTIVE_SESSION_EXPIRY,
-                json.dumps(session_data)
-            )
+            # 5. Update chat title from the first user message in the list
+            user_messages = [m for m in messages if m["role"] == "user"]
+            if user_messages:
+                new_title = user_messages[0]["content"][:50]
+                if len(user_messages[0]["content"]) > 50:
+                    new_title += "..."
+                chat.title = new_title
+            
+            chat.updated_at = now
+        
+        db.commit()
+        
     except Exception as e:
-        print(f"Error updating Redis cache: {e}")
-        pass
+        db.rollback()
+        print(f"Error updating session in DB: {e}")
+        return False
+    finally:
+        db.close()
+
+
+    # 2. Update Redis cache after successful DB commit
+    get_session(session_id, user_id) # Calling get_session will automatically refresh the cache
     
     return True
+"""
 
 
 def delete_session(session_id: str, user_id: Optional[str] = None) -> bool:
@@ -278,53 +379,61 @@ def delete_session(session_id: str, user_id: Optional[str] = None) -> bool:
 
 
 def get_all_sessions(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
-    """
-    Get all sessions from PostgreSQL.
-    
-    Note: We don't cache this in Redis as it's less frequently accessed
-    and can be expensive to maintain cache consistency.
-    """
+    # This function should now work correctly because the data links are fixed
     with get_db_session() as db:
         try:
-            # Get all active sessions
-            db_sessions = db.query(Session).filter(Session.is_active == True, Session.user_id == user_id).all()
-            
-            sessions = []
+            db_sessions = db.query(Session).filter(Session.is_active == True, Session.user_id == user_id).order_by(Session.last_active.desc()).all()
+            sessions_data = []
             for db_session in db_sessions:
-                # Count messages for this session
-                message_count = 0
-                title = f"Chat Session {db_session.id[:8]}"
-                
-                # Get chats for this session
-                chats = db.query(Chat).filter(Chat.session_id == db_session.id).all()
-                
-                for chat in chats:
-                    # Count messages in this chat
-                    count = db.query(Message).filter(Message.chat_id == chat.id).count()
-                    message_count += count
-                    
-                    # Use chat title if available
-                    if chat.title and chat.title != f"Chat {db_session.id[:8]}":
-                        title = chat.title
-                
-                session_data = {
-                    "session_id": db_session.id,
+                chat = db.query(Chat).filter(Chat.session_id == db_session.id).first()
+                title = chat.title if chat else "New Chat"
+                message_count = db.query(Message).filter(Message.session_id == db_session.id).count()
+
+                sessions_data.append({
+                    "session_id": str(db_session.id),
+                    "title": title,
                     "created_at": db_session.created_at.isoformat(),
                     "last_active": db_session.last_active.isoformat(),
-                    "user_id": str(db_session.user_id) if db_session.user_id else None,
-                    "message_count": message_count,
-                    "title": title
-                }
-                
-                sessions.append(session_data)
-            
-            # Sort by last_active (most recent first)
-            sessions.sort(key=lambda x: x["last_active"], reverse=True)
-            
-            return sessions
-            
+                    "user_id": str(db_session.user_id),
+                    "message_count": message_count
+                })
+            return sessions_data
         except Exception as e:
+            print(f"Error in get_all_sessions: {e}")
             return []
+
+
+"""
+def get_all_sessions(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    
+    # Get all sessions for a user, decorated with info from the associated Chat.
+    
+    with get_db_session() as db:
+        try:
+            db_sessions = db.query(Session).filter(Session.is_active == True, Session.user_id == user_id).order_by(Session.last_active.desc()).all()
+            
+            sessions_data = []
+            for db_session in db_sessions:
+                # Find the associated chat to get the title
+                chat = db.query(Chat).filter(Chat.session_id == db_session.id).first()
+                title = chat.title if chat else "New Chat"
+                
+                # Count messages more efficiently
+                message_count = db.query(Message).filter(Message.session_id == db_session.id).count()
+
+                sessions_data.append({
+                    "session_id": str(db_session.id),
+                    "title": title,
+                    "created_at": db_session.created_at.isoformat(),
+                    "last_active": db_session.last_active.isoformat(),
+                    "user_id": str(db_session.user_id),
+                    "message_count": message_count
+                })
+            return sessions_data
+        except Exception as e:
+            print(f"Error in get_all_sessions: {e}")
+            return []
+"""
 
 
 def get_cache_stats() -> Dict[str, Any]:

@@ -1,5 +1,5 @@
 import { supabase } from '@/libs/supabase';
-import { ChatMessage } from '@/types/chat';
+import { ChatMessage, ChatSessionInfo, ChatListItem } from '@/types/chat';
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -9,6 +9,18 @@ export interface StreamInitiationResponse {
   session_id: string;
 }
 
+export interface ChatSessionResponse {
+  session_id: string;
+  created: boolean;
+}
+
+export interface ChatSessionHistoryResponse {
+  session_id: string;
+  title: string | null;
+  messages: ChatMessage[];
+  created_at: string;
+  last_active: string;
+}
 // ------------------ Auth API ------------------
 export async function getAccessToken() {
   // The session here is the session of the user who is logged in
@@ -25,7 +37,7 @@ export async function getCurrentUser() {
 
 
 // ------------------ Chat Session API ------------------
-export async function getChatSessions() {
+export async function getChatSessions(): Promise<ChatSessionInfo[]> {
   const token = await getAccessToken();
   const res = await fetch(`${API_URL}/api/sessions`, {
     method: 'GET',
@@ -37,7 +49,7 @@ export async function getChatSessions() {
   return res.json();
 }
 
-export async function createChatSession() {
+export async function createChatSession(): Promise<ChatSessionResponse> {
   const token = await getAccessToken();
   const res = await fetch(`${API_URL}/api/sessions`, {
     method: 'POST',
@@ -46,22 +58,21 @@ export async function createChatSession() {
       'Content-Type': 'application/json',
     },
   });
-  const data = await res.json();
   if (!res.ok) throw new Error('Failed to create chat session');
-  return data;
+  return res.json();
 }
 
-export async function getChatSessionHistory(chatSessionId: string) {
+
+export async function getChatSessionHistory(chatSessionId: string): Promise<ChatSessionHistoryResponse> {
   const token = await getAccessToken();
   const res = await fetch(`${API_URL}/api/sessions/${chatSessionId}`, {
     method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
+    headers: { 'Authorization': `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to get chat session');
   return res.json();
 }
+
 
 export async function deleteChatSession(chatSessionId: string) {
   const token = await getAccessToken();
@@ -137,5 +148,23 @@ export async function saveChatHistory(messages: ChatMessage[], sessionId: string
     throw new Error('Failed to save chat history');
   }
 
+  return res.json();
+}
+
+
+export async function updateChatTitle(sessionId: string, title: string): Promise<ChatListItem> {
+  const token = await getAccessToken();
+  const res = await fetch(`${API_URL}/api/sessions/${sessionId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ title }),
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to update chat title');
+  }
   return res.json();
 }

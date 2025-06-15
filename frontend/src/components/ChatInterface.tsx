@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import ChatInput from './ChatInput';
 import { GoSidebarExpand } from 'react-icons/go';
 import { FaMoon, FaSun } from 'react-icons/fa';
@@ -11,7 +12,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
 import '../i18n';
 import { FaPersonCircleQuestion, FaXmark } from "react-icons/fa6";
-import { sendMessage, getChatSessionHistory, saveChatHistory } from '@/services/api';
+import { sendMessage, getChatSessionHistory, saveChatHistory, createChatSession } from '@/services/api';
+import { useAuth } from '@/context/AuthProvider';
 
 
 interface ChatInterfaceProps {
@@ -24,10 +26,13 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showFAQModal, setShowFAQModal] = useState(false);
   const [sessionTitle, setSessionTitle] = useState<string>('');
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const { user } = useAuth();
   const { t } = useTranslation();
   const rawFAQS = t('faq', { returnObjects: true });
   const FAQS: string[] = Array.isArray(rawFAQS) ? rawFAQS : [];
   const faqTitle = t('faqTitle');
+  const router = useRouter();
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -49,46 +54,89 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
 
-    const userMessage: ChatMessage = {
-      id: uuidv4(),
-      session_id: chatSessionId,
-      role: 'user',
-      content,
-      created_at: new Date().toISOString(),
-    };
-    
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-  
+    let currentChatId = chatSessionId;
+    let messagesWithUserUpdate = [...messages];
+
+    const isNewChat = chatSessionId === 'new';
+
+    if (isNewChat) {
+      try {
+        const newSession = await createChatSession();
+        if (!newSession.session_id) {
+          throw new Error("Failed to create a new session from backend.");
+        }
+        currentChatId = newSession.session_id;
+
+        router.replace(`/chat/${user?.id}/${currentChatId}`);
+
+        const userMessage: ChatMessage = {
+          id: uuidv4(),
+          session_id: currentChatId,
+          chat_id: currentChatId,
+          role: 'user',
+          content,
+          created_at: new Date().toISOString(),
+        };
+        messagesWithUserUpdate = [userMessage];
+        setMessages(messagesWithUserUpdate);
+
+        await saveChatHistory(messagesWithUserUpdate, currentChatId);
+
+      } catch (error) {
+        console.error("Failed to initialize a new chat session:", error);
+        const errorMessage: ChatMessage = {
+          id: uuidv4(),
+          session_id: currentChatId,
+          chat_id: currentChatId,
+          role: 'assistant',
+          content: "Sorry, I encountered an error while creating a new chat session. Please try again.",
+          created_at: new Date().toISOString(),
+        };
+        setMessages([errorMessage]);
+        return;
+      }
+    } else {
+      const userMessage: ChatMessage = {
+        id: uuidv4(),
+        session_id: currentChatId,
+        chat_id: currentChatId,
+        role: 'user',
+        content,
+        created_at: new Date().toISOString(),
+      };
+      messagesWithUserUpdate = [...messages, userMessage];
+      setMessages(messagesWithUserUpdate);
+    }
+
     try {
-      // Note: We pass updatedMessages to ensure the backend has the complete conversation history
       const streamInitResponse = await sendMessage(
-        updatedMessages,
-        chatSessionId
+        messagesWithUserUpdate,
+        currentChatId
       );
       const streamId = streamInitResponse.stream_id;
-  
+
       if (!streamId) {
         throw new Error("Backend did not return a stream_id");
       }
-  
+
       const assistantMessage: ChatMessage = {
         id: uuidv4(),
-        session_id: chatSessionId,
+        session_id: currentChatId,
+        chat_id: currentChatId,
         role: 'assistant',
         content: '',
         created_at: new Date().toISOString(),
         isStreaming: true,
         streamUrl: `${process.env.NEXT_PUBLIC_API_URL}/api/chat/stream/${streamId}`
       };
-  
+
       setMessages(prev => [...prev, assistantMessage]);
-  
     } catch (error) {
       console.error('Failed to send message:', error);
       const errorMessage: ChatMessage = {
         id: uuidv4(),
-        session_id: chatSessionId,
+        session_id: currentChatId,
+        chat_id: currentChatId,
         role: 'assistant',
         content: "Sorry, I encountered an error. Please try again.",
         created_at: new Date().toISOString(),
@@ -98,65 +146,68 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
     }
   };
 
-  const handleTitleUpdate = (title: string) => {
-    setSessionTitle(title);
-  };
-
   useEffect(() => {
     const loadSessionHistory = async () => {
+      if (chatSessionId === 'new') {
+        setMessages([]);
+        setSessionTitle('New Chat');
+        setIsLoadingHistory(false);
+        return;
+      }
+
+      if (!chatSessionId) {
+        setIsLoadingHistory(false);
+        return;
+      }
+
+      setIsLoadingHistory(true);
+
       try {
         const history = await getChatSessionHistory(chatSessionId);
-        if (history.messages) {
-          const formattedMessages = history.messages.map((msg: { role: string; content: string; created_at: string }) => ({
-            id: uuidv4(),
-            session_id: chatSessionId,
-            role: msg.role,
-            content: msg.content,
-            created_at: new Date(msg.created_at).toISOString(),
-          }));
-          setMessages(formattedMessages);
-        }
-        if (history.title) {
+
+        if (history.title && history.title !== 'New Chat') {
           setSessionTitle(history.title);
         } else {
-          // TODO: change to GPT named title
-          const firstUserMessage = history.messages?.find((msg: { role: string }) => msg.role === 'user');
+          const firstUserMessage = history.messages?.find((msg: ChatMessage) => msg.role === 'user');
           if (firstUserMessage) {
-            const title = firstUserMessage.content.slice(0, 50);
-            setSessionTitle(title + (firstUserMessage.content.length > 50 ? '...' : ''));
+            const title = firstUserMessage.content.slice(0, 30) + (firstUserMessage.content.length > 30 ? '...' : '');
+            setSessionTitle(title);
           } else {
             setSessionTitle('New Chat');
           }
         }
+
+        setMessages(history.messages || []);
       } catch (error) {
         console.error('Failed to load session history:', error);
-        setSessionTitle('New Chat');
+        setSessionTitle('Chat Not Found');
+        setMessages([]);
+      } finally {
+        setIsLoadingHistory(false);
       }
     };
 
-    if (chatSessionId) {
-      loadSessionHistory();
-    }
+    loadSessionHistory();
   }, [chatSessionId]);
 
-  const handleStreamingComplete = useCallback(async (completedMessage: ChatMessage) => {
-    let finalMessages: ChatMessage[] = [];
 
+  const handleStreamingComplete = useCallback(async (completedMessage: ChatMessage) => {
     setMessages(prevMessages => {
-      finalMessages = prevMessages.map(msg => 
-          msg.id === completedMessage.id ? completedMessage : msg
+      const finalMessages = prevMessages.map(msg =>
+        msg.id === completedMessage.id ? completedMessage : msg
       );
+
+      saveChatHistory(finalMessages, chatSessionId)
+        .then(() => {
+          console.log("Session history saved successfully.");
+        })
+        .catch(error => {
+          console.error("Failed to save session history:", error);
+        });
+
       return finalMessages;
-  });
-  
-    try {
-      // Save the complete conversation history to the backend
-      await saveChatHistory(finalMessages, chatSessionId);
-      console.log("Session history saved successfully.");
-    } catch (error) {
-      console.error("Failed to save session history:", error);
-    }
-  }, [chatSessionId]); 
+    });
+  }, [chatSessionId]);
 
   return (
     <div className={`flex flex-col h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900' : 'bg-[#F6F6F6]'}`}>
@@ -170,7 +221,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
             <GoSidebarExpand size={24} />
           </button>
           <p className={`text-sm font-medium w-full text-center ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-            {sessionTitle}
+            {isLoadingHistory ? 'Loading...' : sessionTitle}
           </p>
           <button
             onClick={toggleDarkMode}
@@ -182,12 +233,18 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
         </div>
       </div>
 
-      <ChatSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} isDarkMode={isDarkMode} />
+      <ChatSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} isDarkMode={isDarkMode} currentChatId={chatSessionId} />
 
       <div className="flex-1 flex flex-col mt-14 px-0 sm:px-0 md:px-0">
         <div className="flex-1 overflow-y-auto max-h-[calc(100vh-188px)]">
           <div className="max-w-full mx-auto h-full flex flex-col md:pl-[14rem]">
-            {messages.length === 0 ? (
+
+            {isLoadingHistory ? (
+              <div className="flex-1 flex items-center justify-center">
+                {/* TODO: add loading spinner */}
+                {/* <LoadingSpinner /> */}
+              </div>
+            ) : messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-8">
                 <div className={`mb-6 text-2xl font-bold tracking-wide ${isDarkMode ? 'text-blue-400' : 'text-[#2F70B3]'}`}>{faqTitle}</div>
                 <div className="flex flex-col gap-4 w-[80%] max-w-md">
@@ -195,23 +252,23 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
                     <button
                       key={idx}
                       className={`
-                        w-full flex items-center gap-3
-                        px-5 py-3
-                        rounded-xl
-                        border
-                        ${isDarkMode 
-                          ? 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700 hover:border-blue-500 hover:text-blue-400' 
+                  w-full flex items-center gap-3
+                  px-5 py-3
+                  rounded-xl
+                  border
+                  ${isDarkMode
+                          ? 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700 hover:border-blue-500 hover:text-blue-400'
                           : 'bg-white border-gray-200 text-gray-700 hover:bg-[#eaf3fb] hover:border-[#2F70B3] hover:text-[#2F70B3]'
                         }
-                        shadow-sm
-                        text-base font-medium
-                        transition-colors duration-200
-                        focus:outline-none focus:ring-2 focus:ring-[#2F70B3]/30
-                        cursor-pointer
-                      `}
+                  shadow-sm
+                  text-base font-medium
+                  transition-colors duration-200
+                  focus:outline-none focus:ring-2 focus:ring-[#2F70B3]/30
+                  cursor-pointer
+                `}
                       onClick={() => handleSendMessage(q)}
                     >
-                      <FaPersonCircleQuestion size={20} className={isDarkMode ? 'text-blue-400' : 'text-[#2F70B3]'}/>
+                      <FaPersonCircleQuestion size={20} className={isDarkMode ? 'text-blue-400' : 'text-[#2F70B3]'} />
                       {q}
                     </button>
                   ))}
@@ -232,10 +289,10 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
                     shadow-lg
                     border
                     transition-all duration-200
-                    ${isDarkMode 
-                      ? 'bg-gray-800 border-gray-700 text-blue-400 hover:bg-gray-700' 
-                      : 'bg-white/90 border-gray-200 text-[#2F70B3] hover:bg-blue-50'
-                    }
+                    ${isDarkMode
+                            ? 'bg-gray-800 border-gray-700 text-blue-400 hover:bg-gray-700'
+                            : 'bg-white/90 border-gray-200 text-[#2F70B3] hover:bg-blue-50'
+                          }
                     z-50
                     cursor-pointer
                   `}
@@ -248,10 +305,9 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
           </div>
         </div>
         <div className={`transition-colors duration-300 ${isDarkMode ? 'bg-gray-800 border-t border-gray-700' : 'bg-white border-t border-gray-200'}`}>
-          <ChatInput 
-            onSend={handleSendMessage} 
+          <ChatInput
+            onSend={handleSendMessage}
             isDarkMode={isDarkMode}
-            onTitleUpdate={handleTitleUpdate}
           />
         </div>
       </div>
@@ -281,8 +337,8 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
                     px-4 py-3
                     rounded-lg
                     border
-                    ${isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 hover:border-blue-500 hover:text-blue-400' 
+                    ${isDarkMode
+                      ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 hover:border-blue-500 hover:text-blue-400'
                       : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-[#eaf3fb] hover:border-[#2F70B3] hover:text-[#2F70B3]'
                     }
                     text-sm font-medium
@@ -295,7 +351,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
                     setShowFAQModal(false);
                   }}
                 >
-                  <FaPersonCircleQuestion size={18} className={isDarkMode ? 'text-blue-400' : 'text-[#2F70B3]'}/>
+                  <FaPersonCircleQuestion size={18} className={isDarkMode ? 'text-blue-400' : 'text-[#2F70B3]'} />
                   {q}
                 </button>
               ))}

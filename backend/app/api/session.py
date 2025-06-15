@@ -38,7 +38,7 @@ async def get_all_sessions_endpoint(user: Dict[str, Any] = Depends(verify_supaba
 
 
 @router.post("", response_model=SessionResponse)
-async def create_new_session(user=Depends(verify_supabase_token)):
+async def create_new_session(user: Dict[str, Any] = Depends(verify_supabase_token)):
     """
     Create a new chat session.
     
@@ -46,6 +46,9 @@ async def create_new_session(user=Depends(verify_supabase_token)):
         A SessionResponse with the new session ID
     """
     user_id = user["sub"]
+    
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID not found in token")
     session_id = create_session(user_id=user_id)
     return SessionResponse(session_id=session_id, created=True)
 

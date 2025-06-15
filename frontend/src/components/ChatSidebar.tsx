@@ -1,172 +1,252 @@
 'use client';
 
 import Link from 'next/link';
-import { IoCloseSharp, IoTrashOutline } from 'react-icons/io5';
 import { useAuth } from '@/context/AuthProvider';
+import { useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { createChatSession, deleteChatSession, getChatSessions } from '@/services/api';
+import { IoCloseSharp, IoTrashOutline, IoPencil, IoCheckmark, IoClose } from 'react-icons/io5';
+import { deleteChatSession, getChatSessions, updateChatTitle } from '@/services/api';
+import { ChatListItem } from '@/types/chat';
 
-// TODO: get all sessions from the backend
 
 interface ChatSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   isDarkMode: boolean;
+  currentChatId: string;
 }
 
-interface Session {
-  id: string;
-  title?: string;
-}
-
-interface SessionHistoryResponse {
-  session_id: string;
-  title?: string;
-  created_at: string;
-  last_active: string;
-  message_count: number;
-  user_id: string;
-}
-
-export default function ChatSidebar({ isOpen, onClose, isDarkMode }: ChatSidebarProps) {
+export default function ChatSidebar({ isOpen, onClose, isDarkMode, currentChatId }: ChatSidebarProps) {
   const { user } = useAuth();
-  const userId = user?.id;
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const router = useRouter();
+  const [sessions, setSessions] = useState<ChatListItem[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [newSession, setNewSession] = useState<ChatListItem | null>(null);
 
   const fetchSessions = useCallback(async () => {
-    if (!userId) return;
+    if (!user) return;
     try {
-      const response = await getChatSessions();
-      const formattedSessions = response.map((session: SessionHistoryResponse) => ({
-        id: session.session_id,
-        title: session.title || 'New Chat'
+      const fetchedSessions = await getChatSessions();
+      const activeSessions = fetchedSessions.filter(session => session.message_count > 0).map(session => ({
+        session_id: session.session_id,
+        title: session.title,
+        created_at: session.created_at,
+        last_active: session.last_active || session.created_at,
+        message_count: session.message_count
       }));
-      setSessions(formattedSessions);
+      setSessions(activeSessions);
     } catch (error) {
       console.error('Failed to fetch sessions:', error);
     }
-  }, [userId]);
+  }, [user]);
+
+  useEffect(() => {
+    if (currentChatId && currentChatId !== 'new') {
+      const isNewSession = !sessions.some(session => session.session_id === currentChatId);
+      if (isNewSession) {
+        const newSessionItem: ChatListItem = {
+          session_id: currentChatId,
+          title: 'New Chat',
+          created_at: new Date().toISOString(),
+          last_active: new Date().toISOString(),
+          message_count: 1
+        };
+        setNewSession(newSessionItem);
+        setSessions(prev => {
+          if (prev.some(session => session.session_id === currentChatId)) {
+            return prev;
+          }
+          return [newSessionItem, ...prev];
+        });
+      }
+    }
+  }, [currentChatId, sessions]);
+
+  // TODO: remove this, use another way to fetch sessions
+  useEffect(() => {
+    if (newSession) {
+      const timer = setTimeout(() => {
+        setNewSession(null);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [newSession]);
+
+  useEffect(() => {
+    if (user) {
+      fetchSessions();
+      const interval = setInterval(fetchSessions, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [user, fetchSessions]);
 
   const handleCreateSession = async () => {
-    if (!userId) return;
-    setIsLoading(true);
+    if (!user) return;
+    setIsCreating(true);
     try {
-      const response = await createChatSession();
-      if (response.session_id) {
-        await fetchSessions();
-      }
+      router.push(`/chat/${user?.id}/new`);
+      onClose();
     } catch (error) {
       console.error('Failed to create session:', error);
     } finally {
-      setIsLoading(false);
+      setIsCreating(false);
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteConfirm = async () => {
     if (!deleteId) return;
     try {
       await deleteChatSession(deleteId);
-      setSessions(sessions => sessions.filter(s => s.id !== deleteId));
+      setSessions(prevSessions => prevSessions.filter(s => s.session_id !== deleteId));
+
+      if (currentChatId === deleteId) {
+        handleCreateSession();
+      }
       setDeleteId(null);
     } catch (error) {
       console.error('Failed to delete session:', error);
     }
   };
 
-  useEffect(() => {
-    if (userId) {
-      fetchSessions();
+  const handleEditClick = (session: ChatListItem) => {
+    setEditingId(session.session_id);
+    setEditingTitle(session.title || '');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingTitle('');
+  };
+
+  const handleSaveTitle = async () => {
+    if (!editingId || !editingTitle.trim() || isSaving) return;
+
+    setIsSaving(true);
+    try {
+      await updateChatTitle(editingId, editingTitle.trim());
+
+      setSessions(prev =>
+        prev.map(s => s.session_id === editingId ? { ...s, title: editingTitle.trim() } : s)
+      );
+
+      handleCancelEdit();
+    } catch (error) {
+      console.error('Failed to save title:', error);
+    } finally {
+      setIsSaving(false);
     }
-  }, [userId, fetchSessions]);
+  };
 
   return (
     <>
       <aside
-        className={`fixed top-0 left-0 h-screen w-72 md:w-56 shadow z-40 transform ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        } sm:translate-x-0 transition-transform duration-300 ease-in-out ${
-          isDarkMode ? 'bg-gray-800' : 'bg-gray-50'
-        }`}
+        className={`fixed top-0 left-0 h-screen w-72 md:w-56 shadow-lg z-40 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          } sm:translate-x-0 transition-transform duration-300 ease-in-out ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'
+          }`}
       >
-        <div className={`h-14 pl-4 pr-2 border-b flex justify-between items-center ${
-          isDarkMode ? 'border-gray-700' : 'border-gray-200'
-        }`}>
-          <h3 className={`font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Chat Sessions</h3>
+        <div className={`h-14 pl-4 pr-2 border-b flex justify-between items-center ${isDarkMode ? 'border-gray-700' : 'border-gray-200'
+          }`}>
+          <h3 className={`font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Chat History</h3>
           <button
-            className={`sm:hidden pr-1 rounded-full transition-colors duration-200 ${
-              isDarkMode 
-                ? 'text-gray-200 hover:bg-gray-700' 
-                : 'text-gray-800 hover:bg-gray-200'
-            }`}
+            className={`sm:hidden p-2 rounded-full transition-colors duration-200 ${isDarkMode
+              ? 'text-gray-400 hover:bg-gray-700'
+              : 'text-gray-600 hover:bg-gray-200'
+              }`}
             onClick={onClose}
             title="Close sidebar"
           >
-            <IoCloseSharp size={20} />
+            <IoCloseSharp size={24} />
           </button>
         </div>
-        <div className={`p-2 space-y-1 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+
+        <div className="p-2">
           <button
             onClick={handleCreateSession}
-            disabled={isLoading}
-            className={`w-full p-2 rounded-md transition-colors duration-200 ${
-              isDarkMode 
-                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                : 'bg-blue-500 hover:bg-blue-600 text-white'
-            } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`w-full p-2 mb-2 rounded-md font-semibold transition-colors duration-200 flex items-center justify-center cursor-pointer ${isDarkMode
+              ? 'bg-[#0F396D] hover:bg-[#0056b3] text-white'
+              : 'bg-[#0056b3] hover:bg-[#0F396D] text-white'
+              } ${isCreating ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            {isLoading ? 'Creating...' : 'New Chat'}
+            {isCreating ? 'Creating...' : '+ New Chat'}
           </button>
-          {sessions.map((session) => (
-            <div key={session.id} className="flex items-center group">
-              <Link
-                href={`/chat/${userId}/${session.id}`}
-                className={`flex-1 block p-2 rounded-md transition-colors duration-200 ${
-                  isDarkMode 
-                    ? 'hover:bg-gray-700' 
-                    : 'hover:bg-gray-200'
-                }`}
-                onClick={onClose}
+
+          <div className="flex flex-col space-y-1 overflow-y-auto max-h-[calc(100vh-8rem)]">
+            {sessions.map((session) => (
+              <div 
+                key={session.session_id} 
+                className={`flex items-center group rounded-md p-2 transition-all duration-300 ease-in-out
+                  ${currentChatId === session.session_id 
+                    ? (isDarkMode ? 'bg-gray-700' : 'bg-gray-200')
+                    : (isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200')
+                  }
+                  ${newSession?.session_id === session.session_id ? 'animate-fade-in' : ''}
+                `}
               >
-                {session.title}
-              </Link>
-              <button
-                className={`ml-2 p-1 opacity-60 hover:opacity-100 rounded-full transition-colors duration-200 ${
-                  isDarkMode 
-                    ? 'hover:bg-gray-700' 
-                    : 'hover:bg-blue-50'
-                } cursor-pointer`}
-                title="Delete"
-                onClick={() => setDeleteId(session.id)}
-              >
-                <IoTrashOutline className={isDarkMode ? 'text-blue-400' : 'text-blue-500'} size={18} />
-              </button>
-            </div>
-          ))}
+                {user && editingId === session.session_id ? (
+                  <>
+                    <input
+                      type="text"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      className={`flex-1 bg-transparent border-b text-sm outline-none ${isDarkMode ? 'border-gray-500 text-white' : 'border-gray-400 text-black'}`}
+                      autoFocus
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(); if (e.key === 'Escape') handleCancelEdit(); }}
+                      title="Edit title"
+                      placeholder="Enter new title"
+                    />
+                    <button onClick={handleSaveTitle} disabled={isSaving} className="p-1 ml-2 text-green-500 hover:bg-gray-600 rounded-full" title="Save title">
+                      <IoCheckmark size={18} />
+                    </button>
+                    <button onClick={handleCancelEdit} className="p-1 text-gray-400 hover:bg-gray-600 rounded-full" title="Cancel editing">
+                      <IoClose size={18} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href={`/chat/${user?.id}/${session.session_id}`}
+                      className={`flex-1 block text-sm truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}
+                      onClick={onClose}
+                    >
+                      {session.title || 'New Chat'}
+                    </Link>
+                    <div className="flex items-center md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                      <button className="p-1 cursor-pointer" title="Edit title" onClick={() => handleEditClick(session)}>
+                        <IoPencil className={`${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-800'}`} size={16} />
+                      </button>
+                      <button className="p-1 cursor-pointer" title="Delete chat" onClick={() => setDeleteId(session.session_id)}>
+                        <IoTrashOutline className={`${isDarkMode ? 'text-gray-400 hover:text-red-500' : 'text-gray-600 hover:text-red-500'}`} size={16} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </aside>
 
       {deleteId && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <p className={`mb-4 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-              Are you sure you want to delete this chat?
+          <div className={`p-6 rounded-lg shadow-xl ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <h4 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-black'}`}>Delete Chat?</h4>
+            <p className={`mb-6 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+              Are you sure you want to delete this chat session? This action cannot be undone.
             </p>
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-end space-x-4">
               <button
                 onClick={() => setDeleteId(null)}
-                className={`px-4 py-2 rounded-md ${
-                  isDarkMode 
-                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' 
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                }`}
+                className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-black cursor-pointer"
               >
                 Cancel
               </button>
               <button
-                onClick={handleDelete}
-                className="px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleDeleteConfirm}
+                className="px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white cursor-pointer"
               >
                 Delete
               </button>

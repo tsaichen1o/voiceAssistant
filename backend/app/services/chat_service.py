@@ -6,24 +6,25 @@ from app.models.schemas import Message, ChatRequest, ChatResponse, RAGRequest, U
 from app.config import settings
 import google.generativeai as genai
 from app.services.session_service import create_session, get_session, update_session, redis_client
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 import uuid
 import asyncio
 import json
+from fastapi import HTTPException
 
 
 # Configure Gemini client
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
+
 async def stream_chat_response(messages: list, stream_id: str) -> AsyncGenerator[str, None]:
     """
     An async generator that streams responses from the Gemini model.
-    (Optimized to use structured conversation history)
+    MODIFIED: This version focuses only on the latest user message, ignoring chat history.
     """
     try:
         model = genai.GenerativeModel(settings.GEMINI_MODEL)
         
-        # TODO: modify the system prompt to be more specific to the user's request
         system_prompt = """
         You are a helpful assistant. All your responses must be formatted using Markdown.
         - Use headings (##, ###) for main topics.
@@ -34,31 +35,25 @@ async def stream_chat_response(messages: list, stream_id: str) -> AsyncGenerator
         - No redundant gap between paragraphs.
         """
 
-        # Build the conversation history for Gemini
-        gemini_history = []
-        for message in messages:
-            # Map our 'assistant' role to Gemini's 'model' role
-            role = "model" if message.get('role') == "assistant" else "user"
-            gemini_history.append({
-                "role": role,
-                "parts": [{"text": message.get('content', '')}]
-            })
-            
-        # Add the system prompt as the first part of the conversation
-        # A good approach is to add it before the actual conversation content
-        # Note: Gemini's conversation must alternate between user/model,
-        # so we add the system prompt content before the latest user message
-        if gemini_history:
-            last_message_content = gemini_history[-1]['parts'][0]['text']
-            gemini_history[-1]['parts'][0]['text'] = f"{system_prompt}\n---\n{last_message_content}"
+        if not messages:
+            yield 'data: [error] No message provided.\n\n'
+            return
 
-        # Call the API, this time passing in a list of dicts, not a single string
+        last_user_message = messages[-1]
+        user_question = last_user_message.get('content', '')
+
+        if not user_question.strip():
+            yield 'data: [error] Empty message content.\n\n'
+            return
+
+        prompt_for_model = f"{system_prompt}\n\n---\n\nUSER QUESTION: {user_question}"
+
         response_stream = model.generate_content(
-            gemini_history,
+            prompt_for_model,
             stream=True,
             generation_config=genai.types.GenerationConfig(
                 temperature=0.7,
-                max_output_tokens=1000,
+                max_output_tokens=1800,
             )
         )
 
@@ -67,7 +62,6 @@ async def stream_chat_response(messages: list, stream_id: str) -> AsyncGenerator
                 data_payload = {"content": chunk.text}
                 yield f"data: {json.dumps(data_payload)}\n\n"
                 await asyncio.sleep(0.02)
-        yield "data: [done]\n\n"
 
     except Exception as e:
         print(f"Error during stream generation: {e}")
@@ -76,7 +70,8 @@ async def stream_chat_response(messages: list, stream_id: str) -> AsyncGenerator
     finally:
         redis_client.delete(f"stream_request:{stream_id}")
         print(f"Cleaned up Redis key for stream: {stream_id}")
-
+        yield "data: [done]\n\n"
+        
 
 async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, Any]] = None) -> ChatResponse:
     """
@@ -91,6 +86,9 @@ async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, 
     """
     session_id = request.session_id
     user_id = user_info.get("user_id") if user_info else None
+    
+    if not request.messages:
+        raise HTTPException(status_code=400, detail="No messages provided")
     
     if not session_id:
         if user_info and user_info.get("auth_type") == "supabase":
@@ -123,7 +121,6 @@ async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, 
             conversation_text = f"System: {message.content}\n" + conversation_text
     
     # Generate response with Gemini
-    # TODO: add system prompt
     response = model.generate_content(
         conversation_text,
         generation_config=genai.types.GenerationConfig(
@@ -138,7 +135,7 @@ async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, 
         session_id=session_id,
         role="assistant",
         content=response.text,
-        created_at=datetime.now(UTC).isoformat()
+        created_at=datetime.now(timezone.utc).isoformat()
     )
     
     # Update session with message history - include user context
@@ -190,7 +187,7 @@ async def get_rag_chat_response(request: RAGRequest) -> ChatResponse:
         session_id=session_id,
         role="assistant",
         content="RAG-enhanced chat is coming soon. This feature will allow the model to reference external documents.",
-        created_at=datetime.now(UTC).isoformat()
+        created_at=datetime.now(timezone.utc).isoformat()
     )
     
     return ChatResponse(

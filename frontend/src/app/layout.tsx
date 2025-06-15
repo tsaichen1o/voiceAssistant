@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "../styles/globals.css";
 import { AuthProvider } from "@/context/AuthProvider";
+import NextTopLoader from 'nextjs-toploader';
 
 
 export const metadata: Metadata = {
@@ -27,6 +28,12 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
+        <NextTopLoader
+          color="linear-gradient(to right, rgb(56, 189, 248), rgb(251, 113, 133), rgb(163, 230, 53))"
+          height={5}
+          speed={300}
+          easing="ease"
+        />
           {children}
         </AuthProvider>
       </body>
