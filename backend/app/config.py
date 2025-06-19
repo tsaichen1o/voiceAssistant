@@ -9,10 +9,6 @@ class Settings(BaseSettings):
     APP_NAME: str = "Voice Assistant Backend"
     DEBUG: bool = False
     
-    # OpenAI API settings
-    OPENAI_API_KEY: str
-    OPENAI_MODEL: str = "gpt-4o"
-
     # Google Gemini API settings
     GEMINI_API_KEY: str
     GEMINI_MODEL: str = "gemini-2.0-flash"
