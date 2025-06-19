@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.chat import router as chat_router
 from app.api.session import router as session_router
+from app.api.voice import router as voice_router
 from app.config import settings
 import uvicorn
 
@@ -24,6 +25,7 @@ app.add_middleware(
 # Include routers
 app.include_router(chat_router)
 app.include_router(session_router)
+app.include_router(voice_router)
 
 
 @app.get("/")
