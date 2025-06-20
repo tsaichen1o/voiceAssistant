@@ -13,13 +13,16 @@ import VoiceAssistantOverlay from './VoiceAssistantOverlay';
 interface ChatInputProps {
   onSend: (content: string) => void;
   isDarkMode: boolean;
+  userId?: string;
 }
 
-export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
+export default function ChatInput({ onSend, isDarkMode, userId }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [preview, setPreview] = useState<string[]>([]);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  // Use provided userId or generate a fallback
+  const voiceUserId = userId || `guest-${Math.random().toString().substring(10)}`;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasText = input.trim().length > 0;
@@ -79,7 +82,11 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
 
   return (
     <>
-      <VoiceAssistantOverlay open={voiceOpen} onClose={() => setVoiceOpen(false)} />
+      <VoiceAssistantOverlay 
+        userId={voiceUserId} 
+        isOpen={voiceOpen} 
+        onClose={() => setVoiceOpen(false)} 
+      />
       <div className={`fixed bottom-0 left-0 w-full z-10 px-4 pb-4 ${isDarkMode ? 'bg-gradient-to-t from-gray-900 via-gray-900/90 to-transparent' : 'bg-gradient-to-t from-white via-white/90 to-transparent'} md:ml-56`}>
         <div className={`sm:w-full md:w-[calc(100%-14rem)] rounded-3xl shadow-md border px-4 pt-4 pb-3 flex flex-col gap-3 max-h-[60vh] overflow-y-auto ${isDarkMode
             ? 'bg-gray-800 border-gray-700'
