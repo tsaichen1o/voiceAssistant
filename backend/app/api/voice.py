@@ -17,7 +17,8 @@ router = APIRouter(
 async def voice_events_stream(
     user_id: str, 
     is_audio: str = "true",
-    test_mode: str = "false"
+    test_mode: str = "false",
+    user_info: Dict[str, Any] = Depends(verify_supabase_token)
 ):
     """
     Server-Sent Events (SSE) endpoint for voice assistant communication.
@@ -25,17 +26,14 @@ async def voice_events_stream(
     Args:
         user_id: User identifier
         is_audio: Whether to use audio mode ("true" or "false")
-        test_mode: Skip authentication for testing ("true" or "false")
+        user_info: Authenticated user information
     """
-    print(f"Voice client {user_id} connecting via SSE, audio mode: {is_audio}, test_mode: {test_mode}")
+    print(f"Voice client {user_id} connecting via SSE, audio mode: {is_audio}")
+    print(f"✅ Authenticated user: {user_info.get('email', 'unknown')}")
     
-    # 暂时跳过认证用于测试
-    if test_mode.lower() != "true":
-        print("⚠️ Authentication skipped for testing purposes")
-        # TODO: 生产环境中需要启用认证
-        # raise HTTPException(status_code=401, detail="Authentication required")
-    
-    user_info = {"user_id": user_id}  # 临时用户信息
+    # 验证用户ID匹配
+    if user_info.get('sub') != user_id:
+        raise HTTPException(status_code=403, detail="User ID mismatch")
     
     try:
         # Create voice session
@@ -81,7 +79,7 @@ async def voice_events_stream(
 async def send_voice_message(
     user_id: str, 
     request: Request,
-    test_mode: str = "false"
+    user_info: Dict[str, Any] = Depends(verify_supabase_token)
 ):
     """
     HTTP endpoint for sending messages to the voice assistant.
@@ -89,13 +87,13 @@ async def send_voice_message(
     Args:
         user_id: User identifier
         request: HTTP request containing the message
-        test_mode: Skip authentication for testing ("true" or "false")
+        user_info: Authenticated user information
     """
-    # 暂时跳过认证用于测试
-    if test_mode.lower() != "true":
-        print("⚠️ Authentication skipped for testing purposes")
-        # TODO: 生产环境中需要启用认证
-        # raise HTTPException(status_code=401, detail="Authentication required")
+    print(f"✅ Authenticated user sending voice message: {user_info.get('email', 'unknown')}")
+    
+    # 验证用户ID匹配
+    if user_info.get('sub') != user_id:
+        raise HTTPException(status_code=403, detail="User ID mismatch")
     
     try:
         # Parse the message
@@ -129,58 +127,63 @@ async def send_voice_message(
         raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
 
 
-@router.get("/sessions")
-async def get_active_voice_sessions():
-    """
-    Get list of active voice sessions (test mode - no auth required).
-    """
-    try:
-        sessions = adk_voice_service.get_active_sessions()
-        return {"active_sessions": sessions, "count": len(sessions)}
-    except Exception as e:
-        print(f"Error getting active voice sessions: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get sessions: {str(e)}")
-
-@router.delete("/sessions")
-async def cleanup_all_voice_sessions():
-    """
-    Clean up all active voice sessions (for debugging).
-    """
-    try:
-        sessions = adk_voice_service.get_active_sessions()
-        session_count = len(sessions)
-        
-        for session_id in sessions:
-            try:
-                adk_voice_service.close_session(session_id)
-                print(f"✅ Cleaned up voice session: {session_id}")
-            except Exception as e:
-                print(f"❌ Error cleaning up session {session_id}: {e}")
-        
-        return {
-            "message": f"Cleaned up {session_count} voice sessions",
-            "cleared_sessions": session_count
-        }
-    except Exception as e:
-        print(f"Error during cleanup: {e}")
-        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
-
-
-@router.delete("/session/{user_id}")
-async def close_voice_session(
+@router.get("/sessions/{user_id}")
+async def get_user_voice_session(
     user_id: str,
     user_info: Dict[str, Any] = Depends(verify_supabase_token)
 ):
     """
-    Close a voice session.
-    
-    Args:
-        user_id: User identifier
-        user_info: User authentication information
+    Get user's active voice session.
     """
+    # 验证用户只能访问自己的会话
+    if user_info.get('sub') != user_id:
+        raise HTTPException(status_code=403, detail="Can only access your own sessions")
+    
+    print(f"✅ User {user_info.get('email', 'unknown')} checking their voice session")
     try:
-        adk_voice_service.close_session(user_id)
-        return {"status": "closed"}
+        sessions = adk_voice_service.get_active_sessions()
+        user_session = user_id if user_id in sessions else None
+        return {
+            "user_id": user_id,
+            "has_active_session": user_session is not None,
+            "session_id": user_session
+        }
     except Exception as e:
-        print(f"Error closing voice session for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to close session: {str(e)}") 
+        print(f"Error getting user voice session: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get session: {str(e)}")
+
+@router.delete("/sessions/{user_id}")
+async def cleanup_user_voice_session(
+    user_id: str,
+    user_info: Dict[str, Any] = Depends(verify_supabase_token)
+):
+    """
+    Clean up user's active voice session.
+    """
+    # 验证用户只能清理自己的会话
+    if user_info.get('sub') != user_id:
+        raise HTTPException(status_code=403, detail="Can only cleanup your own session")
+    
+    print(f"✅ User {user_info.get('email', 'unknown')} cleaning up their voice session")
+    try:
+        sessions = adk_voice_service.get_active_sessions()
+        
+        if user_id in sessions:
+            adk_voice_service.close_session(user_id)
+            print(f"✅ Cleaned up voice session for user: {user_id}")
+            return {
+                "message": f"Cleaned up voice session for user {user_id}",
+                "user_id": user_id,
+                "success": True
+            }
+        else:
+            return {
+                "message": f"No active session found for user {user_id}",
+                "user_id": user_id,
+                "success": False
+            }
+    except Exception as e:
+        print(f"Error during cleanup for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
+
+

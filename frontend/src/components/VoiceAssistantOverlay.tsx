@@ -9,6 +9,8 @@ import {
   stopMicrophone,
   base64ToArray,
 } from '@/services/audioProcessor';
+import { getAccessToken } from '@/services/api';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 
 interface VoiceEvent {
   type: 'text' | 'audio';
@@ -27,50 +29,89 @@ export default function VoiceAssistantOverlay({ userId, isOpen, onClose }: Voice
   const [paused, setPaused] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isAudioMode, setIsAudioMode] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [lastResponse, setLastResponse] = useState<string>('');
   
   // Get real-time microphone volume (only when open and not paused)
   const volume = useMicrophoneVolume(isOpen && !paused && isAudioMode);
+  
+  // Use effect to monitor volume changes and interrupt speaking
+  useEffect(() => {
+    if (isSpeaking && volume > 0.1) { // If volume is above threshold while speaking
+      setIsSpeaking(false);
+      // Clear the speaking timeout since user interrupted
+      if (speakingTimeoutRef.current) {
+        clearTimeout(speakingTimeoutRef.current);
+        speakingTimeoutRef.current = null;
+      }
+      console.log('🎤 User interrupted with voice - switching to listening');
+    }
+  }, [volume, isSpeaking]);
   
   // Refs for audio handling
   const audioPlayerNodeRef = useRef<AudioWorkletNode | null>(null);
   const audioPlayerContextRef = useRef<AudioContext | null>(null);
   const audioRecorderNodeRef = useRef<AudioWorkletNode | null>(null);
   const audioRecorderContextRef = useRef<AudioContext | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const eventSourceRef = useRef<AbortController | null>(null);
   const audioBufferRef = useRef<Uint8Array[]>([]);
   const bufferTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Connect to SSE for real-time communication
   const connectSSE = useCallback((audioMode: boolean = true) => {
+    // Abort existing connection
     if (eventSourceRef.current) {
-      eventSourceRef.current.close();
+      eventSourceRef.current.abort();
     }
 
     const sseUrl = `http://localhost:8000/api/voice/events/${userId}?is_audio=${audioMode}`;
     console.log(`🔗 Connecting SSE with audio mode: ${audioMode}`);
     
-    const eventSource = new EventSource(sseUrl);
-    eventSourceRef.current = eventSource;
-
-    eventSource.onopen = () => {
-      console.log('🔗 SSE connection established');
-      setIsConnected(true);
-    };
-
-    eventSource.onmessage = (event) => {
+    const startConnection = async () => {
       try {
-        const messageFromServer: VoiceEvent = JSON.parse(event.data);
-        handleServerMessage(messageFromServer);
+        const token = await getAccessToken();
+        
+        const abortController = new AbortController();
+        eventSourceRef.current = abortController; // Store abort controller for cleanup
+        
+        await fetchEventSource(sseUrl, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          signal: abortController.signal,
+          async onopen(response) {
+            if (response.ok) {
+              console.log('🔗 SSE connection established');
+              setIsConnected(true);
+              // Set audio mode when connection is established
+              setIsAudioMode(true);
+            } else {
+              throw new Error(`Failed to open SSE connection: ${response.status}`);
+            }
+          },
+          onmessage(event) {
+            try {
+              const messageFromServer: VoiceEvent = JSON.parse(event.data);
+              handleServerMessage(messageFromServer);
+            } catch (error) {
+              console.error('Failed to parse server message:', error);
+            }
+          },
+          onerror(error) {
+            console.error('SSE connection error:', error);
+            setIsConnected(false);
+            throw error; // This will stop the connection
+          }
+        });
       } catch (error) {
-        console.error('Failed to parse server message:', error);
+        console.error('Failed to connect SSE:', error);
+        setIsConnected(false);
       }
     };
-
-    eventSource.onerror = (error) => {
-      console.error('SSE connection error:', error);
-      setIsConnected(false);
-    };
+    
+    // Start connection but don't await it
+    startConnection();
   }, [userId]);
 
   // Handle messages from server
@@ -79,10 +120,32 @@ export default function VoiceAssistantOverlay({ userId, isOpen, onClose }: Voice
     
     if (message.type === 'text' && message.text) {
       setLastResponse(message.text);
+      // When we receive text, system is about to speak
+      setIsSpeaking(true);
+      
+      // Set a timeout to reset speaking state (fallback)
+      if (speakingTimeoutRef.current) {
+        clearTimeout(speakingTimeoutRef.current);
+      }
+      speakingTimeoutRef.current = setTimeout(() => {
+        setIsSpeaking(false);
+        console.log('🔇 Speaking timeout - resetting to listening');
+      }, 10000); // 10 seconds timeout
+      
     } else if (message.type === 'audio' && message.data && message.mime_type === "audio/pcm") {
       // Play audio response
       if (audioPlayerNodeRef.current) {
+        setIsSpeaking(true);
         audioPlayerNodeRef.current.port.postMessage(base64ToArray(message.data));
+        
+        // Set a timeout to reset speaking state (fallback)
+        if (speakingTimeoutRef.current) {
+          clearTimeout(speakingTimeoutRef.current);
+        }
+        speakingTimeoutRef.current = setTimeout(() => {
+          setIsSpeaking(false);
+          console.log('🔇 Speaking timeout - resetting to listening');
+        }, 10000); // 10 seconds timeout
       }
     }
   };
@@ -94,6 +157,21 @@ export default function VoiceAssistantOverlay({ userId, isOpen, onClose }: Voice
       const [playerNode, playerCtx] = await startAudioPlayerWorklet();
       audioPlayerNodeRef.current = playerNode as AudioWorkletNode;
       audioPlayerContextRef.current = playerCtx as AudioContext;
+
+      // Listen for audio playback completion
+      if (audioPlayerNodeRef.current) {
+        audioPlayerNodeRef.current.port.onmessage = (event) => {
+          if (event.data.type === 'playback_ended') {
+            setIsSpeaking(false);
+            // Clear the speaking timeout since playback ended naturally
+            if (speakingTimeoutRef.current) {
+              clearTimeout(speakingTimeoutRef.current);
+              speakingTimeoutRef.current = null;
+            }
+            console.log('🔇 Audio playback ended');
+          }
+        };
+      }
 
       // Start audio input
       const [recorderNode, recorderCtx] = await startAudioRecorderWorklet(audioRecorderHandler);
@@ -144,9 +222,14 @@ export default function VoiceAssistantOverlay({ userId, isOpen, onClose }: Voice
     const base64Data = btoa(String.fromCharCode(...combinedArray));
     
     try {
+      const token = await getAccessToken();
+      
       await fetch(`http://localhost:8000/api/voice/send/${userId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           type: 'audio',
           data: base64Data,
@@ -175,11 +258,7 @@ export default function VoiceAssistantOverlay({ userId, isOpen, onClose }: Voice
           // Connect SSE with audio mode
           connectSSE(true);
           
-          // Wait a bit for connection
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          setIsAudioMode(true);
-          console.log('🎤 Voice mode started');
+          console.log('🎤 Voice mode starting...');
         } catch (error) {
           console.error('❌ Failed to start voice mode:', error);
         }
@@ -221,9 +300,15 @@ export default function VoiceAssistantOverlay({ userId, isOpen, onClose }: Voice
       bufferTimerRef.current = null;
     }
     
-    // Close SSE connection
+    // Clear speaking timeout
+    if (speakingTimeoutRef.current) {
+      clearTimeout(speakingTimeoutRef.current);
+      speakingTimeoutRef.current = null;
+    }
+    
+    // Abort SSE connection
     if (eventSourceRef.current) {
-      eventSourceRef.current.close();
+      eventSourceRef.current.abort();
       eventSourceRef.current = null;
     }
     
@@ -241,6 +326,7 @@ export default function VoiceAssistantOverlay({ userId, isOpen, onClose }: Voice
     setIsConnected(false);
     setIsAudioMode(false);
     setPaused(false);
+    setIsSpeaking(false);
     setLastResponse('');
     audioBufferRef.current = [];
     
@@ -281,7 +367,8 @@ export default function VoiceAssistantOverlay({ userId, isOpen, onClose }: Voice
           {!isConnected && '🔄 Connecting...'}
           {isConnected && !isAudioMode && '⚡ Preparing...'}
           {isConnected && isAudioMode && paused && '⏸️ Paused'}
-          {isConnected && isAudioMode && !paused && '🎤 Listening...'}
+          {isConnected && isAudioMode && !paused && isSpeaking && '🔊 Speaking...'}
+          {isConnected && isAudioMode && !paused && !isSpeaking && '🎤 Listening...'}
         </div>
 
         {/* Last response display */}
