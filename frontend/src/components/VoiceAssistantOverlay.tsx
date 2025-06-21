@@ -11,6 +11,7 @@ import {
 } from '@/services/audioProcessor';
 import { getAccessToken } from '@/services/api';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
+import { useAuth } from '@/context/AuthProvider';
 
 interface VoiceEvent {
   type: 'text' | 'audio';
@@ -20,12 +21,12 @@ interface VoiceEvent {
 }
 
 interface VoiceAssistantOverlayProps {
-  userId: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function VoiceAssistantOverlay({ userId, isOpen, onClose }: VoiceAssistantOverlayProps) {
+export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistantOverlayProps) {
+  const { user } = useAuth();
   const [paused, setPaused] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isAudioMode, setIsAudioMode] = useState(false);
@@ -34,6 +35,9 @@ export default function VoiceAssistantOverlay({ userId, isOpen, onClose }: Voice
   
   // Get real-time microphone volume (only when open and not paused)
   const volume = useMicrophoneVolume(isOpen && !paused && isAudioMode);
+  
+  // Get userId from auth context
+  const userId = user?.id || `guest-${Math.random().toString().substring(10)}`;
   
   // Use effect to monitor volume changes and interrupt speaking
   useEffect(() => {

@@ -13,16 +13,13 @@ import VoiceAssistantOverlay from './VoiceAssistantOverlay';
 interface ChatInputProps {
   onSend: (content: string) => void;
   isDarkMode: boolean;
-  userId?: string;
 }
 
-export default function ChatInput({ onSend, isDarkMode, userId }: ChatInputProps) {
+export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [preview, setPreview] = useState<string[]>([]);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  // Use provided userId or generate a fallback
-  const voiceUserId = userId || `guest-${Math.random().toString().substring(10)}`;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasText = input.trim().length > 0;
@@ -83,7 +80,6 @@ export default function ChatInput({ onSend, isDarkMode, userId }: ChatInputProps
   return (
     <>
       <VoiceAssistantOverlay 
-        userId={voiceUserId} 
         isOpen={voiceOpen} 
         onClose={() => setVoiceOpen(false)} 
       />
