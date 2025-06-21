@@ -23,7 +23,6 @@ class Settings(BaseSettings):
     
     # Supabase settings
     SUPABASE_URL: str
-    SUPABASE_ANON_KEY: str
     SUPABASE_JWT_SECRET: str  # Get from supabase
     
     # Database settings - only use DATABASE_URL
