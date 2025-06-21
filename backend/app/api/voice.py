@@ -31,7 +31,7 @@ async def voice_events_stream(
     print(f"Voice client {user_id} connecting via SSE, audio mode: {is_audio}")
     print(f"✅ Authenticated user: {user_info.get('email', 'unknown')}")
     
-    # 验证用户ID匹配
+    # Authenticate UserID
     if user_info.get('sub') != user_id:
         raise HTTPException(status_code=403, detail="User ID mismatch")
     
@@ -91,7 +91,7 @@ async def send_voice_message(
     """
     print(f"✅ Authenticated user sending voice message: {user_info.get('email', 'unknown')}")
     
-    # 验证用户ID匹配
+    # Authenticate UserID
     if user_info.get('sub') != user_id:
         raise HTTPException(status_code=403, detail="User ID mismatch")
     
@@ -135,7 +135,7 @@ async def get_user_voice_session(
     """
     Get user's active voice session.
     """
-    # 验证用户只能访问自己的会话
+    
     if user_info.get('sub') != user_id:
         raise HTTPException(status_code=403, detail="Can only access your own sessions")
     
@@ -160,7 +160,7 @@ async def cleanup_user_voice_session(
     """
     Clean up user's active voice session.
     """
-    # 验证用户只能清理自己的会话
+   
     if user_info.get('sub') != user_id:
         raise HTTPException(status_code=403, detail="Can only cleanup your own session")
     
