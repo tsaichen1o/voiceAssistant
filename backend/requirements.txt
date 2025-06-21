@@ -8,6 +8,8 @@ python-dotenv>=1.0.0
 # === AI / LLM Services ===
 # Google Gemini API
 google-generativeai>=0.3.0
+# Google ADK for voice assistant functionality
+google-adk>=1.2.1
 # openai>=1.10.0  # If you are no longer using OpenAI, you can remove this line
 
 # === Database & ORM ===

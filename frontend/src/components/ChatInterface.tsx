@@ -300,6 +300,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
           <ChatInput
             onSend={handleSendMessage}
             isDarkMode={isDarkMode}
+            userId={user?.id}
           />
         </div>
       </div>
