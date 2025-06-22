@@ -72,11 +72,23 @@ class PCMPlayerProcessor extends AudioWorkletProcessor {
 
     // Handle incoming messages from main thread
     this.port.onmessage = (event) => {
+
+      // Clear the buffer when 'clear' message received
+      if (event.data.command === 'clear') {
+        this.readIndex = this.writeIndex;
+        console.log('Audio player buffer cleared by main thread.');
+        return;
+      }
+      
       // Reset the buffer when 'endOfAudio' message received
       if (event.data.command === 'endOfAudio') {
         this.readIndex = this.writeIndex; // Clear the buffer
         console.log("endOfAudio received, clearing the buffer.");
         return;
+      }
+
+      if (event.data instanceof ArrayBuffer) {
+        this._enqueue(event.data);
       }
 
       // Decode the base64 data to int16 array.

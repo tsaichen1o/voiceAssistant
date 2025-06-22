@@ -31,35 +31,37 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
   const [isAudioMode, setIsAudioMode] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [lastResponse, setLastResponse] = useState<string>('');
+  const isSendingRef = useRef(false);
   
-  // Get real-time microphone volume (only when open and not paused)
   const volume = useMicrophoneVolume(isOpen && !paused && isAudioMode);
+  const userId = user?.id;
   
-  // Get userId from auth context
-  const userId = user?.id || `guest-${Math.random().toString().substring(10)}`;
-  
-  // Use effect to monitor volume changes and interrupt speaking
   useEffect(() => {
-    if (isSpeaking && volume > 0.1) { // If volume is above threshold while speaking
-      setIsSpeaking(false);
-      // Clear the speaking timeout since user interrupted
+    if (isSpeaking && volume > 0.1) {      
+      // 1. Send clear command to AudioWorklet to stop playback immediately
+      if (audioPlayerNodeRef.current) {
+        audioPlayerNodeRef.current.port.postMessage({ command: 'clear' });
+      }
+
+      // 2. Clear the subsequent "speaking timeout" timer that might be triggered
       if (speakingTimeoutRef.current) {
         clearTimeout(speakingTimeoutRef.current);
         speakingTimeoutRef.current = null;
       }
+
+      setIsSpeaking(false);
       console.log('🎤 User interrupted with voice - switching to listening');
     }
   }, [volume, isSpeaking]);
-  
-  // Refs for audio handling
+
   const audioPlayerNodeRef = useRef<AudioWorkletNode | null>(null);
   const audioPlayerContextRef = useRef<AudioContext | null>(null);
   const audioRecorderNodeRef = useRef<AudioWorkletNode | null>(null);
   const audioRecorderContextRef = useRef<AudioContext | null>(null);
   const eventSourceRef = useRef<AbortController | null>(null);
   const audioBufferRef = useRef<Uint8Array[]>([]);
-  const bufferTimerRef = useRef<NodeJS.Timeout | null>(null);
   const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
 
   // Connect to SSE for real-time communication
   const connectSSE = useCallback((audioMode: boolean = true) => {
@@ -154,7 +156,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
   };
 
   // Initialize audio system
-  const initializeAudio = useCallback(async () => {
+  const initializeAudio = async () => {
     try {
       // Start audio output
       const [playerNode, playerCtx] = await startAudioPlayerWorklet();
@@ -187,67 +189,69 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
       console.error('❌ Failed to initialize audio system:', error);
       return false;
     }
-  }, []);
+  };
 
   // Handle audio data from recorder
   function audioRecorderHandler(pcmData: ArrayBuffer) {
-    if (paused) return; // Don't process audio when paused
+    if (paused || !isOpen) return;
     
     audioBufferRef.current.push(new Uint8Array(pcmData));
     
-    // Start sending buffered audio if not already started
-    if (!bufferTimerRef.current) {
-      bufferTimerRef.current = setInterval(sendBufferedAudio, 200);
+    // If the sending loop is not running, start it
+    if (!isSendingRef.current) {
+      sendBufferedAudio();
     }
   }
 
   // Send buffered audio to server
-  const sendBufferedAudio = async () => {
-    if (paused) return; // Don't send audio when paused
+  const sendBufferedAudio = useCallback(async () => {
+    if (paused || !isOpen) {
+      isSendingRef.current = false;
+      return;
+    }
     
-    const audioBuffer = audioBufferRef.current;
-    if (audioBuffer.length === 0) return;
-
-    // Combine all audio chunks
-    let totalLength = 0;
-    for (const chunk of audioBuffer) {
-      totalLength += chunk.length;
+    if (audioBufferRef.current.length === 0) {
+      isSendingRef.current = false;
+      return;
     }
 
+    isSendingRef.current = true;
+
+    // Combine all audio chunks into one
+    const audioBufferToSend = [...audioBufferRef.current];
+    audioBufferRef.current = []; // Clear the buffer immediately, ready to receive new audio
+
+    const totalLength = audioBufferToSend.reduce((acc, chunk) => acc + chunk.length, 0);
     const combinedArray = new Uint8Array(totalLength);
     let offset = 0;
-    for (const chunk of audioBuffer) {
+    for (const chunk of audioBufferToSend) {
       combinedArray.set(chunk, offset);
       offset += chunk.length;
     }
 
-    // Convert to base64 and send
     const base64Data = btoa(String.fromCharCode(...combinedArray));
     
     try {
       const token = await getAccessToken();
-      
       await fetch(`http://localhost:8000/api/voice/send/${userId}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          type: 'audio',
-          data: base64Data,
-          mime_type: 'audio/pcm',
-        }),
+        body: JSON.stringify({ type: 'audio', data: base64Data, mime_type: 'audio/pcm' }),
       });
     } catch (error) {
       console.error('Failed to send audio data:', error);
+      // If there's an error, put the unsent audio back at the beginning of the buffer
+      audioBufferRef.current = [...audioBufferToSend, ...audioBufferRef.current];
+    } finally {
+      // Whether successful or not, check and try to send again after 200ms
+      setTimeout(sendBufferedAudio, 200);
     }
+  }, [isOpen, paused, userId]); 
 
-    // Clear buffer
-    audioBufferRef.current = [];
-  };
-
-  // Initialize audio system when overlay opens
+  // Start audio mode when overlay opens
   useEffect(() => {
     if (isOpen && !isAudioMode) {
       const startAudioMode = async () => {
@@ -269,39 +273,27 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
 
       startAudioMode();
     }
-  }, [isOpen, isAudioMode, connectSSE, initializeAudio]);
+  }, [isOpen, isAudioMode, connectSSE]);
 
   // Handle pause/play toggle
   const handlePauseToggle = () => {
     setPaused(prev => {
       const newPaused = !prev;
-      
-              if (newPaused) {
-          // When pausing, stop sending audio
-          if (bufferTimerRef.current) {
-            clearInterval(bufferTimerRef.current);
-            bufferTimerRef.current = null;
-          }
-          console.log('⏸️ Voice paused');
-        } else {
-          // When resuming, restart audio sending if we have audio
-          if (audioRecorderNodeRef.current && audioBufferRef.current.length === 0) {
-            // Start fresh
-            console.log('▶️ Voice resumed');
-          }
+      if (newPaused) {
+        console.log('⏸️ Voice paused');
+      } else {
+        // When resuming, check and try to send again
+        console.log('▶️ Voice resumed');
+        if (!isSendingRef.current) {
+          sendBufferedAudio();
         }
-      
+      }
       return newPaused;
     });
   };
 
   // Handle close
-  const handleClose = useCallback(() => {
-    // Stop all audio processing
-    if (bufferTimerRef.current) {
-      clearInterval(bufferTimerRef.current);
-      bufferTimerRef.current = null;
-    }
+  const handleClose = () => {
     
     // Clear speaking timeout
     if (speakingTimeoutRef.current) {
@@ -332,17 +324,18 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
     setIsSpeaking(false);
     setLastResponse('');
     audioBufferRef.current = [];
-    
+    isSendingRef.current = false;
+
     console.log('🔚 Voice assistant closed');
     onClose();
-  }, [onClose]);
+  };
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       handleClose();
     };
-  }, [handleClose]);
+  }, []);
 
   return (
     <div
@@ -404,7 +397,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
                 height: 120 + (paused ? 0 : volume * 160),
                 opacity: paused ? 0.15 : 0.28 + volume * 0.28,
                 zIndex: 2,
-              }} 
+              }}
             />
             <div
               className={`absolute rounded-full bg-blue-300 transition-all duration-100 ${
@@ -432,7 +425,6 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
           </div>
         </div>
 
-        {/* Control buttons */}
         <div className="flex gap-12 mt-auto mb-2 z-20">
           <button
             className="size-16 flex justify-center items-center gap-2 px-5 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold transition"
