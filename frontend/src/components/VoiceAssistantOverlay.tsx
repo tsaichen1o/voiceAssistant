@@ -22,9 +22,10 @@ interface VoiceEvent {
 interface VoiceAssistantOverlayProps {
   isOpen: boolean;
   onClose: () => void;
+  isDarkMode: boolean;
 }
 
-export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistantOverlayProps) {
+export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: VoiceAssistantOverlayProps) {
   const { user } = useAuth();
   const [paused, setPaused] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -294,6 +295,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
 
   // Handle close
   const handleClose = () => {
+    console.log('🔚 handleClose called');
     
     // Clear speaking timeout
     if (speakingTimeoutRef.current) {
@@ -340,109 +342,77 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
   return (
     <div
       className={`
-        fixed inset-0 z-50 flex items-center justify-center
-        bg-black/40
-        transition-all duration-500
+        fixed inset-0 z-50 flex flex-col justify-between p-6
+        transition-opacity duration-500 ease-in-out
+        ${isDarkMode ? 'bg-gradient-to-br from-gray-900 to-blue-950' : 'bg-gradient-to-br from-white to-blue-50'}
         ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
       `}
     >
-      <div
-        className={`
-          bg-white rounded-3xl shadow-2xl flex flex-col items-center
-          px-8 py-10
-          transition-transform duration-500
-          ${isOpen ? 'scale-100' : 'scale-0'}
-          origin-bottom-right
-          min-w-[320px] min-h-[380px]
-          relative
-          overflow-hidden
-        `}
-      >
-        {/* Status indicator */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 text-sm text-gray-600">
+      <header className="w-full flex justify-between items-start">
+        <div className={`
+            px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300
+            ${isSpeaking ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-500/20 text-gray-400'}
+        `}>
           {!isConnected && '🔄 Connecting...'}
-          {isConnected && !isAudioMode && '⚡ Preparing...'}
-          {isConnected && isAudioMode && paused && '⏸️ Paused'}
-          {isConnected && isAudioMode && !paused && isSpeaking && '🔊 Speaking...'}
-          {isConnected && isAudioMode && !paused && !isSpeaking && '🎤 Listening...'}
+          {isConnected && paused && '⏸️ Paused'}
+          {isConnected && !paused && isSpeaking && '🔊 Speaking...'}
+          {isConnected && !paused && !isSpeaking && '🎤 Listening...'}
+        </div>
+        <button
+          className="size-12 flex justify-center items-center rounded-full bg-black/20 hover:bg-black/40 text-white transition cursor-pointer relative z-10"
+          onClick={(e) => {
+            handleClose();
+          }}
+          title="Close"
+        >
+          <FaTimes size={20} />
+        </button>
+      </header>
+
+      <main className="flex-1 flex flex-col items-center justify-center -mt-10">
+        <div className="h-24 text-center">
+          <p className={`text-2xl font-semibold transition-opacity duration-300 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+            {lastResponse}
+          </p>
         </div>
 
-        {/* Last response display */}
-        {lastResponse && (
-          <div className="absolute top-8 left-4 right-4 text-xs text-gray-500 text-center bg-gray-50 rounded-lg p-2 max-h-16 overflow-y-auto">
-            AI: {lastResponse}
-          </div>
-        )}
-
-        {/* Animated volume visualization */}
-        <div className="absolute top-36 left-1/2 -translate-x-1/2 z-10">
-          <div className="relative flex items-center justify-center">
+        <div className="relative w-64 h-64 flex items-center justify-center z-0">
+          {[
+            { size: 240, opacity: 0.05, delay: 'delay-300' },
+            { size: 200, opacity: 0.1, delay: 'delay-200' },
+            { size: 160, opacity: 0.15, delay: 'delay-100' },
+            { size: 120, opacity: 0.2, delay: '' },
+          ].map((layer, i) => (
             <div
-              className={`absolute rounded-full bg-blue-100 transition-all duration-100 ${
-                paused ? 'animate-pulse' : ''
-              }`}
+              key={i}
+              className={`absolute rounded-full bg-blue-500 transition-all duration-500 ease-out ${layer.delay} ${paused ? 'animate-pulse' : ''}`}
               style={{
-                width: 140 + (paused ? 0 : volume * 200),
-                height: 140 + (paused ? 0 : volume * 200),
-                opacity: paused ? 0.1 : 0.18 + volume * 0.18,
-                zIndex: 1,
+                width: layer.size + (paused ? 0 : volume * (280 - i * 40)),
+                height: layer.size + (paused ? 0 : volume * (280 - i * 40)),
+                opacity: paused ? 0.05 : layer.opacity,
               }}
             />
-            <div
-              className={`absolute rounded-full bg-blue-200 transition-all duration-100 ${
-                paused ? 'animate-pulse' : ''
-              }`}
-              style={{
-                width: 120 + (paused ? 0 : volume * 160),
-                height: 120 + (paused ? 0 : volume * 160),
-                opacity: paused ? 0.15 : 0.28 + volume * 0.28,
-                zIndex: 2,
-              }}
-            />
-            <div
-              className={`absolute rounded-full bg-blue-300 transition-all duration-100 ${
-                paused ? 'animate-pulse' : ''
-              }`}
-              style={{
-                width: 100 + (paused ? 0 : volume * 120),
-                height: 100 + (paused ? 0 : volume * 120),
-                opacity: paused ? 0.2 : 0.38 + volume * 0.32,
-                zIndex: 3,
-              }}
-            />
-            <div
-              className={`absolute rounded-full bg-[#2F70B3] transition-all duration-100 ${
-                paused ? 'animate-pulse' : ''
-              }`}
-              style={{
-                width: 80 + (paused ? 0 : volume * 100),
-                height: 80 + (paused ? 0 : volume * 100),
-                opacity: paused ? 0.5 : 0.8,
-                zIndex: 4,
-              }}
-            />
-            <div className="absolute text-2xl font-bold text-[#2F70B3] z-10">🤖</div>
+          ))}
+          
+          <div
+            className={`absolute text-4xl transition-transform duration-500 ease-out 
+            ${isSpeaking ? 'scale-125' : 'scale-100'}`}
+          >
+            🤖
           </div>
         </div>
+      </main>
 
-        <div className="flex gap-12 mt-auto mb-2 z-20">
-          <button
-            className="size-16 flex justify-center items-center gap-2 px-5 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold transition"
-            onClick={handlePauseToggle}
-            title={paused ? 'Resume' : 'Pause'}
-            disabled={!isAudioMode}
-          >
-            {paused ? <FaPlay size={24} title="Resume" /> : <FaPause size={24} title="Pause" />}
-          </button>
-          <button
-            className="size-16 flex justify-center items-center gap-2 px-5 py-2 rounded-2xl bg-red-600 hover:bg-red-700 text-[#FAFAFA] font-semibold transition"
-            onClick={handleClose}
-            title="Close"
-          >
-            <FaTimes size={24} title="Close" />
-          </button>
-        </div>
-      </div>
+      <footer className="w-full flex justify-center items-center">
+        <button
+          className="size-20 flex justify-center items-center rounded-full bg-white/90 hover:bg-white shadow-lg text-blue-600 transition-transform hover:scale-105 cursor-pointer"
+          onClick={handlePauseToggle}
+          title={paused ? 'Resume' : 'Pause'}
+          disabled={!isAudioMode}
+        >
+          {paused ? <FaPlay size={28} /> : <FaPause size={28} />}
+        </button>
+      </footer>
     </div>
   );
 }

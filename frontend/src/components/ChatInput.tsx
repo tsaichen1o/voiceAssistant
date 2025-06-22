@@ -82,7 +82,8 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
     <>
       <VoiceAssistantOverlay 
         isOpen={voiceOpen} 
-        onClose={() => setVoiceOpen(false)} 
+        onClose={() => {setVoiceOpen(false);}} 
+        isDarkMode={isDarkMode}
       />
       <div className={`fixed bottom-0 left-0 w-full z-10 px-4 pb-4 ${isDarkMode ? 'bg-gradient-to-t from-gray-900 via-gray-900/90 to-transparent' : 'bg-gradient-to-t from-white via-white/90 to-transparent'} md:ml-56`}>
         <div className={`sm:w-full md:w-[calc(100%-14rem)] rounded-3xl shadow-md border px-4 pt-4 pb-3 flex flex-col gap-3 max-h-[60vh] overflow-y-auto ${isDarkMode
@@ -102,7 +103,7 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
                   />
                   <button
                     onClick={() => handleRemovePreview(idx)}
-                    className={`absolute -top-2 -right-2 rounded-full p-1 shadow-sm ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-white text-black'
+                    className={`absolute -top-2 -right-2 rounded-full p-1 shadow-sm cursor-pointer ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-white text-black'
                       }`}
                     title="Remove"
                     type="button"
@@ -149,7 +150,7 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
               <button
                 onClick={handleSubmit}
                 disabled={isSending}
-                className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode
+                className={`p-2 rounded-full transition-colors duration-200 cursor-pointer ${isDarkMode
                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
                     : 'bg-gray-800 hover:bg-gray-900 text-white'
                   } ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -160,7 +161,7 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
               </button>
             ) : (
               <button
-                className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode
+                className={`p-2 rounded-full transition-colors duration-200 cursor-pointer ${isDarkMode
                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
                     : 'bg-gray-800 hover:bg-gray-900 text-white'
                   } ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`}
