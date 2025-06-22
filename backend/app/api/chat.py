@@ -7,7 +7,7 @@ import uuid
 import json
 
 from app.models.schemas import ChatRequest, ChatResponse, RAGRequest, Message
-from app.services.chat_service import get_chat_response, get_rag_chat_response, stream_chat_response
+from app.services.chat_service import get_chat_response, stream_chat_response
 from app.services.session_service import redis_client
 from app.utils.supabase_auth import verify_supabase_token
 
@@ -34,6 +34,7 @@ async def chat(request: ChatRequest, user_info: Dict[str, Any] = Depends(verify_
             raise HTTPException(status_code=500, detail=str(e))
     else:
         stream_id = str(uuid.uuid4())
+        print(f"Set redis: stream_request:{stream_id} = {request.model_dump_json(include={'messages'})}")
         
         redis_client.set(
             f"stream_request:{stream_id}",
@@ -43,6 +44,7 @@ async def chat(request: ChatRequest, user_info: Dict[str, Any] = Depends(verify_
 
         # Endpoint for frontend to connect to the stream
         return {"stream_id": stream_id, "session_id": request.session_id}
+    
 
 
 @router.get("/chat/stream/{stream_id}")
@@ -63,8 +65,12 @@ async def chat_stream(stream_id: str, user_info: dict = Depends(verify_supabase_
             return
         request_data = json.loads(stored_request_data)
         messages = request_data.get("messages", [])
+        print(f"Fetch redis: stream_request:{stream_id} found = {stored_request_data is not None}")
         async for chunk in stream_chat_response(messages, stream_id):
-            yield chunk
+            if isinstance(chunk, bytes):
+                yield chunk.decode('utf-8')
+            else:
+                yield chunk
 
     return StreamingResponse(event_gen(), media_type="text/event-stream")
 

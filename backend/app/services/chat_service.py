@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from typing import Dict, Any, Optional, AsyncGenerator
-from app.utils.gemini_client import generate_chat_completion
-from app.models.schemas import Message, ChatRequest, ChatResponse, RAGRequest, Usage, CompletionTokensDetails, PromptTokensDetails
+from app.models.schemas import Message, ChatRequest, ChatResponse, RAGRequest, Usage
 from app.config import settings
 import google.generativeai as genai
 from app.services.session_service import create_session, get_session, update_session, redis_client
@@ -11,16 +10,134 @@ import uuid
 import asyncio
 import json
 from fastapi import HTTPException
+from google.api_core.client_options import ClientOptions
+from google.cloud import discoveryengine_v1 as discoveryengine
+import google.generativeai as genai
+from google.api_core.client_options import ClientOptions
+from google.cloud import discoveryengine_v1 as discoveryengine
+
+# Source: https://cloud.google.com/generative-ai-app-builder/docs/preview-search-results?hl=zh-tw#genappbuilder_search_lite-python
 
 
 # Configure Gemini client
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
 
+# TODO: Handle stream error
+# TODO: Handle language
+# TODO: Handle multiple turn chatting
 async def stream_chat_response(messages: list, stream_id: str) -> AsyncGenerator[str, None]:
+    try:
+        if not messages:
+            yield 'data: [error] No message provided.\n\n'
+            return
+
+        user_question = messages[-1].get('content', '')
+        if not user_question.strip():
+            yield 'data: [error] Empty message content.\n\n'
+            return
+
+        # ===== 1. Vertex AI Search, get summary/citations =====
+        project_id = settings.VERTEX_AI_SEARCH_PROJECT_ID
+        location = settings.VERTEX_AI_SEARCH_LOCATION
+        engine_id = settings.VERTEX_AI_SEARCH_ENGINE_ID
+
+        client_options = ClientOptions(
+            api_endpoint=f"{location}-discoveryengine.googleapis.com"
+        ) if location != "global" else None
+
+        client = discoveryengine.SearchServiceClient(client_options=client_options)
+        serving_config = f"projects/{project_id}/locations/{location}/collections/default_collection/engines/{engine_id}/servingConfigs/default_config"
+        print("SEARCH SERVING CONFIG:", serving_config)
+
+        content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
+            summary_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec(
+                summary_result_count=5,
+                include_citations=True,
+                ignore_adversarial_query=True,
+                ignore_non_summary_seeking_query=True,
+                model_prompt_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelPromptSpec(
+                    preamble="Please help me answer TUM application questions based on the following content."
+                ),
+                model_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelSpec(
+                    version="stable"
+                ),
+            ),
+            snippet_spec=discoveryengine.SearchRequest.ContentSearchSpec.SnippetSpec(
+                return_snippet=True
+            )
+        )
+
+        request = discoveryengine.SearchRequest(
+            serving_config=serving_config,
+            query=user_question,
+            page_size=10,
+            content_search_spec=content_search_spec,
+            # query_expansion_spec=discoveryengine.SearchRequest.QueryExpansionSpec(
+            #     condition=discoveryengine.SearchRequest.QueryExpansionSpec.Condition.AUTO
+            # ),
+            spell_correction_spec=discoveryengine.SearchRequest.SpellCorrectionSpec(
+                mode=discoveryengine.SearchRequest.SpellCorrectionSpec.Mode.AUTO
+            )
+        )
+
+        search_response = client.search(request)
+        summary_text = ""
+        citations = []
+
+        if hasattr(search_response, "summary") and search_response.summary:
+            summary_text = search_response.summary.summary_text
+            if hasattr(search_response.summary, "citation_metadata"):
+                # citation_metadata is a repeated field
+                citations = [{
+                    "title": c.title,
+                    "uri": c.uri
+                } for c in getattr(search_response.summary.citation_metadata, "citations", [])]
+
+        # ===== 2. Prepare prompt for Gemini =====
+        system_prompt = (
+            "You are a TUM application assistant. Please answer questions based on the official content, using professional Markdown format, and citing sources when necessary."
+        )
+
+        if summary_text:
+            prompt_for_gemini = (
+                f"{system_prompt}\n\n"
+                f"---Here is the official knowledge found by the search engine---\n"
+                f"{summary_text}\n"
+                f"---END---\n"
+                f"User question: {user_question}"
+            )
+        else:
+            prompt_for_gemini = (
+                f"{system_prompt}\n\n"
+                f"【Note】If no clear official knowledge can answer the user's question, please politely suggest the user to ask a different question or rephrase it.\n"
+                f"User question: {user_question}"
+            )
+
+        model = genai.GenerativeModel(settings.GEMINI_MODEL)
+        response_stream = model.generate_content(prompt_for_gemini, stream=True)
+
+        # ===== 3. stream Gemini result =====
+        for chunk in response_stream:
+            if chunk.text:
+                data_payload = {"content": chunk.text}
+                yield f"data: {json.dumps(data_payload)}\n\n"
+                await asyncio.sleep(0.02)
+        # add citations at the end
+        yield f"data: {json.dumps({'content': '', 'citations': citations})}\n\n"
+
+    except Exception as e:
+        print(f"Error during stream generation: {e}")
+        yield f"data: [error] An error occurred while generating the response.\n\n"
+    finally:
+        redis_client.delete(f"stream_request:{stream_id}")
+        yield "data: [done]\n\n"
+
+
+async def stream_chat_response_basic(messages: list, stream_id: str) -> AsyncGenerator[str, None]:
     """
     An async generator that streams responses from the Gemini model.
-    MODIFIED: This version focuses only on the latest user message, ignoring chat history.
+    Basic version without RAG for testing.
     """
     try:
         model = genai.GenerativeModel(settings.GEMINI_MODEL)
@@ -53,7 +170,7 @@ async def stream_chat_response(messages: list, stream_id: str) -> AsyncGenerator
             stream=True,
             generation_config=genai.types.GenerationConfig(
                 temperature=0.7,
-                max_output_tokens=1800,
+                max_output_tokens=800,
             )
         )
 
@@ -65,13 +182,15 @@ async def stream_chat_response(messages: list, stream_id: str) -> AsyncGenerator
 
     except Exception as e:
         print(f"Error during stream generation: {e}")
-        yield f"data: [error] An error occurred while generating the response.\n\n"
+        error_payload = {"content": f"[error] An error occurred while generating the response: {str(e)}"}
+        yield f"data: {json.dumps(error_payload)}\n\n"
+        yield "data: [done]\n\n"
 
     finally:
         redis_client.delete(f"stream_request:{stream_id}")
         print(f"Cleaned up Redis key for stream: {stream_id}")
         yield "data: [done]\n\n"
-        
+
 
 async def get_chat_response(request: ChatRequest, user_info: Optional[Dict[str, Any]] = None) -> ChatResponse:
     """

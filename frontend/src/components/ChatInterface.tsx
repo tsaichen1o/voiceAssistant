@@ -50,12 +50,20 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
     localStorage.setItem('theme', newTheme ? 'dark' : 'light');
   };
 
-  // TODO: handle error on sending the first message
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
 
     let currentChatId = chatSessionId;
     let messagesWithUserUpdate = [...messages];
+
+    const userMessage: ChatMessage = {
+      id: uuidv4(),
+      session_id: currentChatId,
+      chat_id: currentChatId,
+      role: 'user',
+      content,
+      created_at: new Date().toISOString(),
+    };
 
     const isNewChat = chatSessionId === 'new';
 
@@ -69,14 +77,9 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
 
         router.replace(`/chat/${user?.id}/${currentChatId}`);
 
-        const userMessage: ChatMessage = {
-          id: uuidv4(),
-          session_id: currentChatId,
-          chat_id: currentChatId,
-          role: 'user',
-          content,
-          created_at: new Date().toISOString(),
-        };
+        userMessage.session_id = currentChatId;
+        userMessage.chat_id = currentChatId;
+        
         messagesWithUserUpdate = [userMessage];
         setMessages(messagesWithUserUpdate);
 
@@ -96,24 +99,21 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
         return;
       }
     } else {
-      const userMessage: ChatMessage = {
-        id: uuidv4(),
-        session_id: currentChatId,
-        chat_id: currentChatId,
-        role: 'user',
-        content,
-        created_at: new Date().toISOString(),
-      };
+      userMessage.session_id = currentChatId;
+      userMessage.chat_id = currentChatId;
+      
       messagesWithUserUpdate = [...messages, userMessage];
       setMessages(messagesWithUserUpdate);
     }
 
     try {
-      const streamInitResponse = await sendMessage(
-        messagesWithUserUpdate,
-        currentChatId
-      );
+      // const streamInitResponse = await sendMessage(
+      //   messagesWithUserUpdate,
+      //   currentChatId
+      // );
+      const streamInitResponse = await sendMessage([userMessage], currentChatId);
       const streamId = streamInitResponse.stream_id;
+      console.log("SSE stream_id:", streamId);
 
       if (!streamId) {
         throw new Error("Backend did not return a stream_id");

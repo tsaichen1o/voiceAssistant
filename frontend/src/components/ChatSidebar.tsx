@@ -77,12 +77,12 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode, currentChatId
   }, [newSession]);
 
   useEffect(() => {
-    if (user) {
+    if (user && isOpen) {
       fetchSessions();
       const interval = setInterval(fetchSessions, 5000);
       return () => clearInterval(interval);
     }
-  }, [user, fetchSessions]);
+  }, [user, fetchSessions, isOpen]);
 
   const handleCreateSession = async () => {
     if (!user) return;

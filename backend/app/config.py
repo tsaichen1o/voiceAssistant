@@ -21,7 +21,8 @@ class Settings(BaseSettings):
     VERTEX_AI_SEARCH_LOCATION: str
     VERTEX_AI_SEARCH_DATA_STORE_ID_WEB: str
     VERTEX_AI_SEARCH_DATA_STORE_ID_FAQ: str
-    
+    VERTEX_AI_SEARCH_ENGINE_ID: str
+
     # API Key authentication (former version)
     API_KEY_HEADER: str = "Authorization"
     API_KEY_PREFIX: str = "Bearer"
