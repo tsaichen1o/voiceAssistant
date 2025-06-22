@@ -37,7 +37,7 @@ substitutions:
   _SERVICE_NAME: 'voiceassistant-backend'
   _REGION: 'europe-west3'
   _ARTIFACT_REPO_NAME: 'cloud-run-source-deploy'
-  _DB_SECRET_NAME: 'SUPABASE_DB_URL'
+  _DB_SECRET_NAME: 'DATABASE_URL'
 
 options:
   logging: CLOUD_LOGGING_ONLY
