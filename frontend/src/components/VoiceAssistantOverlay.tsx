@@ -6,7 +6,6 @@ import { useMicrophoneVolume } from '@/hooks/useMicrophoneVolume';
 import {
   startAudioPlayerWorklet,
   startAudioRecorderWorklet,
-  stopMicrophone,
   base64ToArray,
 } from '@/services/audioProcessor';
 import { getAccessToken } from '@/services/api';
@@ -155,7 +154,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
   };
 
   // Initialize audio system
-  const initializeAudio = async () => {
+  const initializeAudio = useCallback(async () => {
     try {
       // Start audio output
       const [playerNode, playerCtx] = await startAudioPlayerWorklet();
@@ -188,7 +187,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
       console.error('❌ Failed to initialize audio system:', error);
       return false;
     }
-  };
+  }, []);
 
   // Handle audio data from recorder
   function audioRecorderHandler(pcmData: ArrayBuffer) {
@@ -248,7 +247,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
     audioBufferRef.current = [];
   };
 
-  // Start audio mode when overlay opens
+  // Initialize audio system when overlay opens
   useEffect(() => {
     if (isOpen && !isAudioMode) {
       const startAudioMode = async () => {
@@ -270,7 +269,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
 
       startAudioMode();
     }
-  }, [isOpen, isAudioMode, connectSSE]);
+  }, [isOpen, isAudioMode, connectSSE, initializeAudio]);
 
   // Handle pause/play toggle
   const handlePauseToggle = () => {
@@ -297,7 +296,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
   };
 
   // Handle close
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     // Stop all audio processing
     if (bufferTimerRef.current) {
       clearInterval(bufferTimerRef.current);
@@ -336,14 +335,14 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
     
     console.log('🔚 Voice assistant closed');
     onClose();
-  };
+  }, [onClose]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       handleClose();
     };
-  }, []);
+  }, [handleClose]);
 
   return (
     <div
@@ -405,7 +404,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose }: VoiceAssistan
                 height: 120 + (paused ? 0 : volume * 160),
                 opacity: paused ? 0.15 : 0.28 + volume * 0.28,
                 zIndex: 2,
-              }}
+              }} 
             />
             <div
               className={`absolute rounded-full bg-blue-300 transition-all duration-100 ${

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import {
   RiChatVoiceAiFill,
   RiSendPlane2Fill,
@@ -92,9 +93,11 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
             <div className="flex gap-2 mb-1 overflow-x-auto">
               {preview.map((img, idx) => (
                 <div key={idx} className="relative w-20 h-20 shrink-0">
-                  <img
+                  <Image
                     src={img}
                     alt={`Preview ${idx + 1}`}
+                    width={80}
+                    height={80}
                     className="w-full h-full object-cover rounded-md"
                   />
                   <button
