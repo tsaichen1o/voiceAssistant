@@ -296,7 +296,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
             )}
           </div>
         </div>
-        <div className={`transition-colors duration-300 ${isDarkMode ? 'bg-gray-800 border-t border-gray-700' : 'bg-white border-t border-gray-200'}`}>
+        <div className={`transition-colors duration-300 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
           <ChatInput
             onSend={handleSendMessage}
             isDarkMode={isDarkMode}
