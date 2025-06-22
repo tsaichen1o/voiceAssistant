@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     # Voice model - use experimental version for better real-time voice performance
     VOICE_MODEL: str = "gemini-2.0-flash-exp"
     
+    # Vertex AI Search settings
+    VERTEX_AI_SEARCH_PROJECT_ID: str
+    VERTEX_AI_SEARCH_LOCATION: str
+    VERTEX_AI_SEARCH_DATA_STORE_ID_WEB: str
+    VERTEX_AI_SEARCH_DATA_STORE_ID_FAQ: str
+    
     # API Key authentication (former version)
     API_KEY_HEADER: str = "Authorization"
     API_KEY_PREFIX: str = "Bearer"

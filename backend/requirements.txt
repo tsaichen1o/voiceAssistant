@@ -11,6 +11,7 @@ google-generativeai>=0.3.0
 # Google ADK for voice assistant functionality
 google-adk>=1.2.1
 # openai>=1.10.0  # If you are no longer using OpenAI, you can remove this line
+google-cloud-discoveryengine
 
 # === Database & ORM ===
 # SQLAlchemy for database interaction and Alembic for migrations
