@@ -360,9 +360,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
         </div>
         <button
           className="size-12 flex justify-center items-center rounded-full bg-black/20 hover:bg-black/40 text-white transition cursor-pointer relative z-10"
-          onClick={(e) => {
-            handleClose();
-          }}
+          onClick={() => {handleClose();}}
           title="Close"
         >
           <FaTimes size={20} />
