@@ -157,7 +157,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   };
 
   // Initialize audio system
-  const initializeAudio = async () => {
+  const initializeAudio = useCallback(async () => {
     try {
       // Start audio output
       const [playerNode, playerCtx] = await startAudioPlayerWorklet();
@@ -190,7 +190,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       console.error('❌ Failed to initialize audio system:', error);
       return false;
     }
-  };
+  }, []);
 
   // Handle audio data from recorder
   function audioRecorderHandler(pcmData: ArrayBuffer) {
@@ -274,7 +274,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
       startAudioMode();
     }
-  }, [isOpen, isAudioMode, connectSSE]);
+  }, [isOpen, isAudioMode, connectSSE, initializeAudio]);
 
   // Handle pause/play toggle
   const handlePauseToggle = () => {
@@ -294,7 +294,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   };
 
   // Handle close
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     console.log('🔚 handleClose called');
     
     // Clear speaking timeout
@@ -330,14 +330,14 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
     console.log('🔚 Voice assistant closed');
     onClose();
-  };
+  }, [onClose]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       handleClose();
     };
-  }, []);
+  }, [handleClose]);
 
   return (
     <div
@@ -359,11 +359,13 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
           {isConnected && !paused && !isSpeaking && '🎤 Listening...'}
         </div>
         <button
-          className="size-12 flex justify-center items-center rounded-full bg-black/20 hover:bg-black/40 text-white transition cursor-pointer relative z-10"
-          onClick={(e) => {
+          className="size-12 flex justify-center items-center rounded-full bg-red-500 hover:bg-red-600 text-white transition cursor-pointer relative z-50 border-2 border-white"
+          onClick={() => {
             handleClose();
           }}
           title="Close"
+          style={{ pointerEvents: 'auto' }}
+          type="button"
         >
           <FaTimes size={20} />
         </button>
