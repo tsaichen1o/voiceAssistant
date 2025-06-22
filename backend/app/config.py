@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     # Google Gemini API settings
     GEMINI_API_KEY: str
     GEMINI_MODEL: str = "gemini-2.0-flash"
+    GOOGLE_GENAI_USE_VERTEXAI: bool = False
+    # Voice model - use experimental version for better real-time voice performance
+    VOICE_MODEL: str = "gemini-2.0-flash-exp"
     
     # API Key authentication (former version)
     API_KEY_HEADER: str = "Authorization"
@@ -20,7 +23,6 @@ class Settings(BaseSettings):
     
     # Supabase settings
     SUPABASE_URL: str
-    SUPABASE_ANON_KEY: str
     SUPABASE_JWT_SECRET: str  # Get from supabase
     
     # Database settings - only use DATABASE_URL
