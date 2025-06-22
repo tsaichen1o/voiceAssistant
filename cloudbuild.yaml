@@ -39,11 +39,7 @@ substitutions:
   _ARTIFACT_REPO_NAME: 'cloud-run-source-deploy'
   _DB_SECRET_NAME: 'SUPABASE_DB_URL'
 
-# --- THE FIX IS HERE ---
-# Specify logging behavior to resolve the "invalid argument" error regarding logs_bucket.
-# This tells Cloud Build to send logs directly to Cloud Logging instead of a GCS bucket.
 options:
   logging: CLOUD_LOGGING_ONLY
 
-# Set the timeout for the build
 timeout: '1200s'
