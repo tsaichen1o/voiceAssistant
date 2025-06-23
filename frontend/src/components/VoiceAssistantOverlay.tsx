@@ -71,7 +71,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       eventSourceRef.current.abort();
     }
 
-    const sseUrl = `http://localhost:8000/api/voice/events/${userId}?is_audio=${audioMode}`;
+    const sseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/voice/events/${userId}?is_audio=${audioMode}`;
     console.log(`🔗 Connecting SSE with audio mode: ${audioMode}`);
     
     const startConnection = async () => {
@@ -234,7 +234,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     
     try {
       const token = await getAccessToken();
-      await fetch(`http://localhost:8000/api/voice/send/${userId}`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/voice/send/${userId}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
