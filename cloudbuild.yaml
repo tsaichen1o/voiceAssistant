@@ -30,7 +30,7 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
-      - '--set-secrets=_DATABASE_URL=${_DB_SECRET_NAME}:latest'
+      - '--set-secrets=DATABASE_URL=${_DB_SECRET_NAME}:latest'
       - '--memory=1Gi'
       - '--cpu=1'
       - '--timeout=300'
