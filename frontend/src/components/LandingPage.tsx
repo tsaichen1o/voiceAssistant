@@ -13,19 +13,35 @@ export default function LandingPage() {
   // TODO: add chatSessionId to state
   // const [chatSessionId, setChatSessionId] = useState<string | null>(null);
   const [creatingChatSession, setCreatingChatSession] = useState(false);
+  const [dotCount, setDotCount] = useState(0);
 
   const { user } = useAuth();
   const userId = user?.id || 'guest';
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (creatingChatSession) {
+      interval = setInterval(() => {
+        setDotCount((prev) => (prev + 1) % 4);
+      }, 300);
+    } else {
+      setDotCount(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [creatingChatSession]);
 
   const handleStartNow = async () => {
     setCreatingChatSession(true);
     try {
       const session = await createChatSession();
       // setChatSessionId(session.session_id);
-      window.location.href = `/chat/${userId}/${session.session_id}`;
+      setTimeout(() => {
+        window.location.href = `/chat/${userId}/${session.session_id}`;
+      }, 500);
     } catch {
       alert('Failed to create chat session, please try again later');
-    } finally {
       setCreatingChatSession(false);
     }
   };
@@ -63,20 +79,27 @@ export default function LandingPage() {
       </p>
 
       <div className={`flex gap-4 mt-6 transition-opacity duration-700 ${showButton ? 'opacity-100' : 'opacity-0'}`}>
-        <button
-          onClick={handleStartNow}
-          className="px-4 py-2 bg-[#2F70B3] text-white rounded-md text-sm sm:text-base md:text-lg hover:bg-[#2F70B3]/80 transition-colors duration-300 cursor-pointer"
-          disabled={creatingChatSession}
-        >
-          {creatingChatSession ? 'Creating...' : 'Start Now'}
-        </button>
-        {!user && (
+        {!user ? (
           <Link
             href="/login"
             className="px-4 py-2 border border-[#2F70B3] text-[#2F70B3] rounded-md text-sm sm:text-base md:text-lg bg-white hover:bg-[#f1f7ff] cursor-pointer"
           >
             Login
           </Link>
+        ) : (
+          <button
+            onClick={handleStartNow}
+            className="px-4 py-2 bg-[#2F70B3] text-white rounded-md text-sm sm:text-base md:text-lg hover:bg-[#2F70B3]/80 transition-colors duration-300 cursor-pointer"
+            disabled={creatingChatSession}
+          >
+            {creatingChatSession ? (
+              <span>
+                Creating{'.'.repeat(dotCount)}
+              </span>
+            ) : (
+              'Start Now'
+            )}
+          </button>
         )}
       </div>
     </div>

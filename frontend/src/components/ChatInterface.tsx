@@ -26,6 +26,9 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showFAQModal, setShowFAQModal] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isThinking, setIsThinking] = useState(false);
+  const [dotCount, setDotCount] = useState(0);
+  
   const { user } = useAuth();
   const { t } = useTranslation();
   const rawFAQS = t('faq', { returnObjects: true });
@@ -50,8 +53,32 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
     localStorage.setItem('theme', newTheme ? 'dark' : 'light');
   };
 
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isThinking) {
+      interval = setInterval(() => {
+        setDotCount((prev) => (prev + 1) % 4);
+      }, 400);
+    } else {
+      setDotCount(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isThinking]);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.role === 'assistant' && !lastMsg.isStreaming) {
+        setIsThinking(false);
+      }
+    }
+  }, [messages]);
+
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
+    setIsThinking(true);
 
     let currentChatId = chatSessionId;
     let messagesWithUserUpdate = [...messages];
@@ -200,7 +227,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
       <div className={`fixed top-0 left-0 w-full z-30 transition-colors duration-300 ${isDarkMode ? 'bg-gray-800/90 backdrop-blur-md' : 'bg-white'} shadow-sm border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
         <div className="h-14 flex items-center px-4 sm:px-6 md:px-8 relative">
           <button
-            className={`p-2 rounded-full absolute left-4 transition-colors duration-200 ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100'}`}
+            className={`p-2 rounded-full absolute left-4 transition-colors duration-200 cursor-pointer ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100'}`}
             onClick={() => setIsSidebarOpen(true)}
             title="Toggle sidebar"
           >
@@ -273,6 +300,13 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
                   onStreamingComplete={handleStreamingComplete}
                   isDarkMode={isDarkMode}
                 />
+                {isThinking && (
+                  <div className="flex items-center justify-center py-2">
+                    <span className={`text-base font-medium ${isDarkMode ? 'text-blue-300' : 'text-[#2F70B3]'}`}>
+                      Thinking{'.'.repeat(dotCount)}
+                    </span>
+                  </div>
+                )}
                 <button
                   onClick={() => setShowFAQModal(true)}
                   className={`
@@ -314,7 +348,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
               <h2 className={`text-xl font-bold ${isDarkMode ? 'text-blue-400' : 'text-[#2F70B3]'}`}>{faqTitle}</h2>
               <button
                 onClick={() => setShowFAQModal(false)}
-                className={`p-2 rounded-full ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                className={`p-2 rounded-full cursor-pointer ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                 title="Close FAQ"
               >
                 <FaXmark size={20} />

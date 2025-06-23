@@ -152,7 +152,7 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode, currentChatId
           }`}>
           <h3 className={`font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Chat History</h3>
           <button
-            className={`sm:hidden p-2 rounded-full transition-colors duration-200 ${isDarkMode
+            className={`sm:hidden p-2 rounded-full transition-colors duration-200 cursor-pointer ${isDarkMode
               ? 'text-gray-400 hover:bg-gray-700'
               : 'text-gray-600 hover:bg-gray-200'
               }`}
@@ -198,10 +198,10 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode, currentChatId
                       title="Edit title"
                       placeholder="Enter new title"
                     />
-                    <button onClick={handleSaveTitle} disabled={isSaving} className="p-1 ml-2 text-green-500 hover:bg-gray-600 rounded-full" title="Save title">
+                    <button onClick={handleSaveTitle} disabled={isSaving} className="p-1 ml-2 cursor-pointer text-green-500 hover:bg-gray-600 rounded-full" title="Save title">
                       <IoCheckmark size={18} />
                     </button>
-                    <button onClick={handleCancelEdit} className="p-1 text-gray-400 hover:bg-gray-600 rounded-full" title="Cancel editing">
+                    <button onClick={handleCancelEdit} className="p-1 cursor-pointer text-gray-400 hover:bg-gray-600 rounded-full" title="Cancel editing">
                       <IoClose size={18} />
                     </button>
                   </>
