@@ -34,7 +34,7 @@ export default function ChatMessage({ message, onStreamingComplete, isDarkMode }
     `;
 
     return (
-        <div className={`flex w-full my-1 ${isUser ? 'justify-end' : 'justify-start pl-6 pr-4 py-2'}`}>
+        <div className={`flex w-full my-1 ${isUser ? 'justify-end' : 'justify-start pl-6 pr-4 py-1'}`}>
             <div
                 className={`
                     max-w-[80%]

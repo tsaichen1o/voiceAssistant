@@ -49,3 +49,16 @@ export interface ChatHistoryResponse {
   created_at: string;
   last_active: string;
 }
+
+export interface Citation {
+  source: string;
+  title: string;
+  index: number;
+}
+
+export interface StreamResponse {
+  content?: string;
+  citations?: Citation[];
+  error?: string;
+  status?: string;
+}

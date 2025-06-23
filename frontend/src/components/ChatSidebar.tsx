@@ -143,10 +143,20 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode, currentChatId
 
   return (
     <>
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 sm:hidden"
+          onClick={onClose}
+        ></div>
+      )}
       <aside
-        className={`fixed top-0 left-0 h-screen w-72 md:w-56 shadow-lg z-40 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'
-          } sm:translate-x-0 transition-transform duration-300 ease-in-out ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'
-          }`}
+        className={`
+          fixed top-0 left-0 h-full w-72 md:w-56 shadow-lg z-40 
+          transition-transform duration-300 ease-in-out
+          ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'}
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          sm:translate-x-0
+        `}
       >
         <div className={`h-14 pl-4 pr-2 border-b flex justify-between items-center ${isDarkMode ? 'border-gray-700' : 'border-gray-200'
           }`}>
@@ -176,10 +186,10 @@ export default function ChatSidebar({ isOpen, onClose, isDarkMode, currentChatId
 
           <div className="flex flex-col space-y-1 overflow-y-auto max-h-[calc(100vh-8rem)]">
             {sessions.map((session) => (
-              <div 
-                key={session.session_id} 
+              <div
+                key={session.session_id}
                 className={`flex items-center group rounded-md p-2 transition-all duration-300 ease-in-out
-                  ${currentChatId === session.session_id 
+                  ${currentChatId === session.session_id
                     ? (isDarkMode ? 'bg-gray-700' : 'bg-gray-200')
                     : (isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200')
                   }
