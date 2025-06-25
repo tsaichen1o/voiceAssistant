@@ -1,9 +1,5 @@
-import os
-import json
 import base64
-import asyncio
-from typing import Dict, Optional, AsyncGenerator, Any
-from pathlib import Path
+from typing import Dict, AsyncGenerator, Any
 from dotenv import load_dotenv
 
 from google.genai.types import (
@@ -11,7 +7,6 @@ from google.genai.types import (
     Content,
     Blob,
 )
-
 from google.adk.runners import InMemoryRunner
 from google.adk.agents import LiveRequestQueue, Agent
 from google.adk.agents.run_config import RunConfig
@@ -53,6 +48,10 @@ class ADKVoiceService:
         Returns:
             Tuple of (live_events generator, live_request_queue)
         """
+        if user_id in self.active_sessions:
+            self.close_session(user_id)
+            print(f"Cleaned up existing session for user {user_id} before creating a new one.")
+
         # Create a Runner
         runner = InMemoryRunner(
             app_name=APP_NAME,
@@ -65,9 +64,8 @@ class ADKVoiceService:
             user_id=user_id,
         )
         
-        # Set response modality
-        modality = "AUDIO" if is_audio else "TEXT"
-        run_config = RunConfig(response_modalities=[modality])
+        # Create run config without modality (using default settings)
+        run_config = RunConfig()
         
         # Create a LiveRequestQueue for this session
         live_request_queue = LiveRequestQueue()
