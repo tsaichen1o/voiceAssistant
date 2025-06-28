@@ -88,14 +88,5 @@ class RAGRequest(ChatRequest):
     use_rag: bool = True
 
 
-# Voice models
-class VoiceRequest(BaseModel):
-    """Request model for voice transcription (for future use)."""
-    audio_data: str  # Base64 encoded audio
-    language: Optional[str] = "en"
-
-
-class TranscriptionResponse(BaseModel):
-    """Response model for voice transcription (for future use)."""
-    text: str
-    confidence: Optional[float] = None 
+# Voice functionality is now handled by Redis Voice Service
+# using Google ADK for real-time voice processing 

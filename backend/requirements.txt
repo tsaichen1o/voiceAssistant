@@ -10,6 +10,8 @@ python-dotenv>=1.0.0
 google-generativeai>=0.3.0
 # Google ADK for voice assistant functionality
 google-adk>=1.2.1
+# Google Cloud AI Platform for Vertex AI Agent Engine
+google-cloud-aiplatform>=1.60.0
 # openai>=1.10.0  # If you are no longer using OpenAI, you can remove this line
 google-cloud-discoveryengine
 
@@ -22,6 +24,8 @@ alembic>=1.13.0
 # === Caching ===
 # Redis client for session management and caching
 redis>=5.0.0
+# Async Redis support for voice service
+redis[hiredis]>=5.0.0
 
 # === Data Validation & Settings ===
 # Pydantic is crucial for FastAPI's data validation
