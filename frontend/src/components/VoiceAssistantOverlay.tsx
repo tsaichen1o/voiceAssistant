@@ -307,7 +307,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
                 try {
                   const data = JSON.parse(line.substring(6));
                   handleServerMessage(data);
-                } catch (e) {
+                } catch {
                   console.warn('Failed to parse chunk:', line);
                 }
               }
@@ -349,7 +349,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
       startAudioMode();
     }
-  }, [isOpen, isAudioMode, connectSSE]);
+  }, [isOpen, isAudioMode, connectSSE, initializeAudio]);
 
   // Handle pause/play toggle
   const handlePauseToggle = () => {
@@ -414,7 +414,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     return () => {
       handleClose();
     };
-  }, []);
+  }, [handleClose]);
 
   return (
     <div
