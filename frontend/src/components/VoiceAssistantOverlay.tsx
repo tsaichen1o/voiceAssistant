@@ -136,7 +136,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   const handleServerMessage = (message: VoiceEvent) => {
     console.log('📨 Received Redis server message:', message);
     
-    // 处理 session_created 事件
+    // Handle session_created event
     if (message.type === 'session_created' && message.session_id) {
       console.log('🔍 Setting sessionId from:', message.session_id);
       setSessionId(message.session_id);
@@ -145,13 +145,13 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       return;
     }
     
-    // 处理 heartbeat 事件
+    // Handle heartbeat event
     if (message.type === 'heartbeat') {
       console.log('💓 Heartbeat received');
       return;
     }
     
-    // 处理错误事件
+    // Handle error event
     if (message.type === 'error') {
       console.error('❌ Server error:', message.error || message.message);
       return;
@@ -277,7 +277,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     
     try {
       const token = await getAccessToken();
-      // 使用新的 Redis API 端点和 session_id
+      // Use new Redis API endpoint with session_id
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/voice-redis/send/${currentSessionId}`, {
         method: 'POST',
         headers: { 
@@ -291,7 +291,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
-      // 处理流式响应
+      // Handle streaming response
       const reader = response.body?.getReader();
       if (reader) {
         try {
