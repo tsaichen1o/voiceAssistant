@@ -14,6 +14,10 @@ google-adk>=1.2.1
 google-cloud-aiplatform>=1.60.0
 # openai>=1.10.0  # If you are no longer using OpenAI, you can remove this line
 google-cloud-discoveryengine
+# Google Cloud Speech for voice transcription
+google-cloud-speech>=2.21.0
+# Google API Core for client options
+google-api-core>=2.11.0
 
 # === Database & ORM ===
 # SQLAlchemy for database interaction and Alembic for migrations
@@ -39,6 +43,8 @@ python-multipart>=0.0.6
 httpx>=0.25.0
 # For handling JSON Web Tokens
 PyJWT>=2.10.1
+# Audio processing
+pydub>=0.25.1
 
 # === Testing ===
 pytest>=7.4.0
