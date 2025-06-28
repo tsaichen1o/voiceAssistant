@@ -136,7 +136,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   const handleServerMessage = (message: VoiceEvent) => {
     console.log('📨 Received Redis server message:', message);
     
-    // Handle session_created event
+    // 处理 session_created 事件
     if (message.type === 'session_created' && message.session_id) {
       console.log('🔍 Setting sessionId from:', message.session_id);
       setSessionId(message.session_id);
@@ -145,13 +145,13 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       return;
     }
     
-    // Handle heartbeat event
+    // 处理 heartbeat 事件
     if (message.type === 'heartbeat') {
       console.log('💓 Heartbeat received');
       return;
     }
     
-    // Handle error event
+    // 处理错误事件
     if (message.type === 'error') {
       console.error('❌ Server error:', message.error || message.message);
       return;
@@ -191,7 +191,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   };
 
   // Initialize audio system
-  const initializeAudio = async () => {
+  const initializeAudio = useCallback(async () => {
     try {
       // Start audio output
       const [playerNode, playerCtx] = await startAudioPlayerWorklet();
@@ -224,7 +224,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       console.error('❌ Failed to initialize audio system:', error);
       return false;
     }
-  };
+  }, [paused, isOpen, setIsSpeaking]);
 
   // Handle audio data from recorder
   function audioRecorderHandler(pcmData: ArrayBuffer) {
@@ -277,7 +277,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     
     try {
       const token = await getAccessToken();
-      // Use new Redis API endpoint with session_id
+      // 使用新的 Redis API 端点和 session_id
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/voice-redis/send/${currentSessionId}`, {
         method: 'POST',
         headers: { 
@@ -291,7 +291,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
-      // Handle streaming response
+      // 处理流式响应
       const reader = response.body?.getReader();
       if (reader) {
         try {
@@ -349,7 +349,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
       startAudioMode();
     }
-  }, [isOpen, isAudioMode, connectSSE, initializeAudio]);
+  }, [isOpen, isAudioMode, connectSSE]);
 
   // Handle pause/play toggle
   const handlePauseToggle = () => {
@@ -369,7 +369,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   };
 
   // Handle close
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     console.log('🔚 handleClose called');
     
     // Clear speaking timeout
@@ -407,14 +407,14 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
     console.log('🔚 Redis voice assistant closed');
     onClose();
-  };
+  }, [onClose]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       handleClose();
     };
-  }, [handleClose]);
+  }, []);
 
   return (
     <div
