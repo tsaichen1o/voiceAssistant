@@ -191,7 +191,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   };
 
   // Initialize audio system
-  const initializeAudio = async () => {
+  const initializeAudio = useCallback(async () => {
     try {
       // Start audio output
       const [playerNode, playerCtx] = await startAudioPlayerWorklet();
@@ -224,7 +224,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       console.error('❌ Failed to initialize audio system:', error);
       return false;
     }
-  };
+  }, [paused, isOpen, setIsSpeaking]);
 
   // Handle audio data from recorder
   function audioRecorderHandler(pcmData: ArrayBuffer) {
@@ -349,7 +349,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
       startAudioMode();
     }
-  }, [isOpen, isAudioMode, connectSSE, initializeAudio]);
+  }, [isOpen, isAudioMode, connectSSE]);
 
   // Handle pause/play toggle
   const handlePauseToggle = () => {
@@ -369,7 +369,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   };
 
   // Handle close
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     console.log('🔚 handleClose called');
     
     // Clear speaking timeout
@@ -407,14 +407,14 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
     console.log('🔚 Redis voice assistant closed');
     onClose();
-  };
+  }, [onClose]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       handleClose();
     };
-  }, [handleClose]);
+  }, []);
 
   return (
     <div

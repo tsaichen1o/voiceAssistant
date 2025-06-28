@@ -33,7 +33,7 @@ print("📋 [MAIN] Including routers...")
 app.include_router(chat_router)
 print("✅ [MAIN] Chat router included")
 app.include_router(session_router)
-print("✅ [MAIN] Session router included") 
+print("✅ [MAIN] Session router included")
 app.include_router(voice_redis_router)
 print("✅ [MAIN] Voice Redis router included")
 
