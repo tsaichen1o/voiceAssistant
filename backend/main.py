@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.chat import router as chat_router
 from app.api.session import router as session_router
 from app.api.voice_redis import router as voice_redis_router
+from app.api.email import router as email_router
 from app.config import settings
 import uvicorn
 
@@ -36,6 +37,8 @@ app.include_router(session_router)
 print("✅ [MAIN] Session router included")
 app.include_router(voice_redis_router)
 print("✅ [MAIN] Voice Redis router included")
+app.include_router(email_router)
+print("✅ [MAIN] Email router included")
 
 
 @app.get("/")

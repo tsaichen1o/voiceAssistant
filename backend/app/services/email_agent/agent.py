@@ -38,11 +38,9 @@ def send_email(user_email: str, recipient_email: str, user_question: str):
         }
 
 
-
-
-root_agent = Agent(
+email_agent = Agent(
     name="email_agent",
-    model="gemini-2.0-flash",
+    model=settings.GEMINI_MODEL,
     description=(
         "Agent to ask for user email and send an email to the human staff to answer user difficult question later"
     ),
@@ -53,7 +51,7 @@ root_agent = Agent(
         "choose the staff that works on the area that most related to the "
         "who you believe can answer the question. The staffs and their email " \
         "addresses are shown in here." \
-        "Tsai Chen Lo (responsible for tuition fees related topics): junidev5@gmail.com " \
+        "TsaiChen Lo (responsible for tuition fees related topics): junidev5@gmail.com " \
         "Duong Bui (responsible for application submission related topics): junidev5@gmail.com" \
         "Rui Tang (responsible for advising which program to select): junidev5@gmail.com" \
         "Zhihong Wu (responsible for programs related information): junidev5@gmail.com" \
