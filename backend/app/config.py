@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: Optional[str] = None
+
+    # Email settings (for sending email to human when LLM cannot solve)
+    SMTP_SERVER: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    EMAIL_ADDRESS: str
+    EMAIL_PASSWORD: str
     
     class Config:
         env_file = ".env"
