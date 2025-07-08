@@ -1,92 +1,104 @@
-"""This is for calling the Email Agent, which is responsible for sending email
-to human staff when the Base Agent encounters the question that it cannot answer.
-
-Source: https://google.github.io/adk-docs/tutorials/agent-team/
-"""
-
-import asyncio
-import os
-
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
-
-from app.services.email_agent import email_agent
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from app.config import settings
+from typing import Dict
+import html
 from app.config import settings
 
-os.environ["GOOGLE_API_KEY"] = settings.GEMINI_API_KEY
+def send_inquiry_email(user_email: str, user_question: str, chat_history_str: str) -> Dict:
+    """
+    Automatically determines the recipient based on keywords in the user's question.
 
+    Args:
+        user_email (str): User's email address for follow-up.
+        user_question (str): User's last question that couldn't be answered.
+        chat_history_str (str): Formatted chat history text.
 
-class EmailAgent:
-    """A class for managing conversation between email agent and user"""
-    def __init__(self):
-        """Initialize the class"""
-        self.user_id = "user_1"
-        self.session_id = "session_001"
-        self.runner = None
+    Returns:
+        Dict: Status and message.
+    """
+    recipient_email = settings.DEFAULT_EMAIL_RECIPIENT
+    question_lower = user_question.lower()
 
-    async def initialize_runner(self):
-        """Initialize the session and the runner. This function should only be
-        called one for each chat session, to keep chat history saved."""
-        # Create a new session service to store state
-        session_service = InMemorySessionService()
-        # Create a new session
-        app_name = "email_app"
-        session = await session_service.create_session(
-            app_name=app_name,
-            user_id=self.user_id,
-            session_id=self.session_id,
-        )
-        self.runner = Runner(
-            agent=email_agent, # The agent we want to run
-            app_name=app_name,   # Associates runs with our app
-            session_service=session_service # Uses our session manager
-        )
-        return self.runner
+    if "tuition" in question_lower or "fee" in question_lower:
+        # TsaiChen Lo (responsible for tuition fees related topics)
+        recipient_email = settings.TUITION_EMAIL_RECIPIENT
+    elif "application" in question_lower or "submit" in question_lower:
+        # Duong Bui (responsible for application submission related topics)
+        recipient_email = settings.APPLICATION_EMAIL_RECIPIENT
+    elif "program" in question_lower or "select" in question_lower:
+        # Rui Tang (responsible for advising which program to select)
+        recipient_email = settings.PROGRAM_EMAIL_RECIPIENT
 
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = f"go42TUM Assistant <{settings.EMAIL_ADDRESS}>"
+        msg['To'] = recipient_email
+        msg['Subject'] = f"[go42TUM Inquiry] User question about: {user_question[:30]}..."
 
-    async def call_agent_async(self, user_input: str):
-        """Sends a query to the agent and return the final response.
-        Args:
-            user_input (str): user input
+        escaped_question = html.escape(user_question)
+        escaped_history = html.escape(chat_history_str)
+
+        theme_color = "#3070b3"
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>TUM Assistant Inquiry</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4;">
+            <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                <div style="background-color: {theme_color}; color: #ffffff; padding: 20px; text-align: center;">
+                    <h1 style="margin: 0; font-size: 24px;">go42TUM Inquiry</h1>
+                </div>
+                <div style="padding: 20px;">
+                    <p style="color: #333333; line-height: 1.6;">Dear TUM Staff,</p>
+                    <p style="color: #333333; line-height: 1.6;">The AI assistant was unable to answer a user's question. Please review the details below and respond to the user directly.</p>
+                    
+                    <div style="background-color: #f9f9f9; border-left: 4px solid {theme_color}; padding: 15px; margin: 20px 0;">
+                        <h3 style="margin-top: 0; color: {theme_color};">USER'S EMAIL FOR FOLLOW-UP</h3>
+                        <p style="margin-bottom: 0; font-size: 16px;"><a href="mailto:{user_email}" style="color: #0056b3;">{user_email}</a></p>
+                    </div>
+
+                    <div style="margin: 20px 0;">
+                        <h3 style="color: {theme_color};">FAILED QUESTION</h3>
+                        <p style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; color: #555555; font-style: italic;">
+                            {escaped_question}
+                        </p>
+                    </div>
+
+                    <div style="margin: 20px 0;">
+                        <h3 style="color: {theme_color};">RECENT CONVERSATION HISTORY</h3>
+                        <pre style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; color: #333333;">{escaped_history}</pre>
+                    </div>
+                </div>
+                <div style="background-color: #eeeeee; color: #888888; text-align: center; padding: 10px; font-size: 12px;">
+                    <p>This email was automatically generated by the TUM AI Assistant.</p>
+                </div>
+            </div>
+        </body>
+        </html>
         """
-        print(f"\n>>> User Question: {user_input}")
 
-        # Prepare the user's message in ADK format
-        content = types.Content(role='user', parts=[types.Part(text=user_input)])
+        msg.attach(MIMEText(html_body, 'html'))
 
-        final_response_text = "Agent did not produce a final response." # Default
+        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
+            server.starttls()
+            server.login(settings.EMAIL_ADDRESS, settings.EMAIL_PASSWORD)
+            server.send_message(msg)
 
-        # We iterate through events to find the final answer.
-        async for event in self.runner.run_async(user_id=self.user_id, session_id=self.session_id, new_message=content):
-            # See all events during execution
-            print(f"  [Event] Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}, Content: {event.content}")
-
-            # Key Concept: is_final_response() marks the concluding message for the turn.
-            if event.is_final_response():
-                if event.content and event.content.parts:
-                    # Assuming text response in the first part
-                    final_response_text = event.content.parts[0].text
-                elif event.actions and event.actions.escalate: # Handle potential errors/escalations
-                    final_response_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
-                break # Stop processing events once the final response is found
-
-        print(f"<<< Agent Response: {final_response_text}")
-        return final_response_text
-
-# -------- For testing this file independently ------------------------------
-async def main():
-    """Stimulate a conversation to test the functionality"""
-    email_class = EmailAgent()
-    runner = await email_class.initialize_runner()
-    print("HELLO, WELCOME TO THE EMAIL AGENT")
-    user_question = ""
-    while user_question != "q":
-        user_question = input("How can we help you: ")
-        print(f"User: {user_question}")
-        agent_response = await email_class.call_agent_async(user_question)
-        print(f"Agent: {agent_response}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+        print(f"✅ Inquiry email sent successfully to {recipient_email}")
+        return {
+            "status": "success",
+            "message": "The email was sent successfully."
+        }
+    except Exception as e:
+        print(f"❌ Error sending email: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to send email. Encountered this error: {e}"
+        }
