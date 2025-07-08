@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     EMAIL_ADDRESS: str = ""
     EMAIL_PASSWORD: str = ""
+    DEFAULT_EMAIL_RECIPIENT: str = ""
+    TUITION_EMAIL_RECIPIENT: str = ""
+    APPLICATION_EMAIL_RECIPIENT: str = ""
+    PROGRAM_EMAIL_RECIPIENT: str = ""
 
     class Config:
         env_file = ".env"
