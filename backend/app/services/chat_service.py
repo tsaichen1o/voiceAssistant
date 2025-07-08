@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from typing import Dict, Any, Optional, AsyncGenerator
-from app.models.schemas import Message, ChatRequest, ChatResponse, RAGRequest, Usage
+from app.models.schemas import Message, ChatRequest, ChatResponse, Usage
 from app.config import settings
-import google.generativeai as genai
 from app.services.session_service import (
     create_session,
     get_session,
@@ -17,18 +16,17 @@ import json
 from fastapi import HTTPException
 from google.api_core.client_options import ClientOptions
 from google.cloud import discoveryengine_v1 as discoveryengine
-import google.generativeai as genai
-from google.api_core.client_options import ClientOptions
-from google.cloud import discoveryengine_v1 as discoveryengine
+from google.generativeai.generative_models import GenerativeModel
+from google.generativeai.types import GenerationConfig
+from google.generativeai.client import configure
 
 # Source: https://cloud.google.com/generative-ai-app-builder/docs/preview-search-results?hl=zh-tw#genappbuilder_search_lite-python
 
 
 # Configure Gemini client
-genai.configure(api_key=settings.GEMINI_API_KEY)
+configure(api_key=settings.GEMINI_API_KEY)
 
 
-# TODO: Handle stream error
 # TODO: Handle language
 # TODO: Handle multiple turn chatting
 async def stream_chat_response(
@@ -104,8 +102,19 @@ async def stream_chat_response(
                         search_response.summary.citation_metadata, "citations", []
                     )
                 ]
-
+                
         # ===== 2. Prepare prompt for Gemini =====
+        negative_keywords = [
+            "cannot answer",
+            "no information",
+            "not available",
+            "unable to find",
+            "do not contain information",
+            "sorry, but"
+        ]
+        
+        is_negative_summary = any(kw in summary_text.lower() for kw in negative_keywords)
+        
         system_prompt = (
             "You are a RAG chatbot who provides professional advice (in Markdown format) to applicants interested in applying to TUM programs.\n"
             "\n"
@@ -165,8 +174,8 @@ async def stream_chat_response(
             # "Be professional, clear, and respond in English primarily, but also in Chinese if the user's question is in Chinese and specify Simplified Chinese and Traditional Chinese. Please use the user's language to respond."
         # )
 
-        # TODO: add chat history
-        if summary_text:
+        if summary_text and not is_negative_summary:
+            print("📢 RAG found a valid answer. Proceeding with Gemini.")
             prompt_for_gemini = (
                 f"{system_prompt}\n\n"
                 f"--- Context ---\n"
@@ -176,32 +185,31 @@ async def stream_chat_response(
                 # f"Chat history: {chat_history}\n"
                 f"Latest user question: {user_question}"
             )
+            model = GenerativeModel(settings.GEMINI_MODEL)
+            response_stream = model.generate_content(prompt_for_gemini, stream=True)
+            
+            # ===== 3. stream Gemini result =====
+            for chunk in response_stream:
+                if chunk.text:
+                    data_payload = {"type": "content", "content": chunk.text}
+                    yield f"data: {json.dumps(data_payload)}\n\n"
+                    await asyncio.sleep(0.05)
+            # add citations at the end
+            yield f"data: {json.dumps({'type': 'citation', 'citations': citations})}\n\n"
         else:
-            prompt_for_gemini = (
-                f"{system_prompt}\n\n"
-                "No official information matching the user's question was found in the knowledge base.\n"
-                "Politely suggest the user to rephrase or ask a different question."
-                # f"\n\nChat history: {chat_history}\n"
-                f"Latest user question: {user_question}"
-            )
+            print("👼🏾 RAG did not find a valid answer. Triggering Email Agent suggestion.")
+            suggestion_payload = {
+                "type": "email_suggestion",
+                "message": "I couldn't find a definitive answer in my knowledge base. Would you like me to forward your question to a human assistant? If so, please provide your email address."
+            }
+            yield f"data: {json.dumps(suggestion_payload)}\n\n"
 
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)
-        response_stream = model.generate_content(prompt_for_gemini, stream=True)
-
-        # ===== 3. stream Gemini result =====
-        for chunk in response_stream:
-            if chunk.text:
-                data_payload = {"content": chunk.text}
-                yield f"data: {json.dumps(data_payload)}\n\n"
-                await asyncio.sleep(0.05)
-        # add citations at the end
-        yield f"data: {json.dumps({'content': '', 'citations': citations})}\n\n"
 
     except Exception as e:
         print(f"Error during stream generation: {e}")
         yield f"data: [error] An error occurred while generating the response.\n\n"
     finally:
-        redis_client.delete(f"stream_request:{stream_id}")
+        # redis_client.delete(f"stream_request:{stream_id}")
         yield "data: [done]\n\n"
 
 
@@ -213,7 +221,7 @@ async def stream_chat_response_basic(
     Basic version without RAG for testing.
     """
     try:
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)
+        model = GenerativeModel(settings.GEMINI_MODEL)
 
         system_prompt = """
         You are a helpful assistant. All your responses must be formatted using Markdown.
@@ -241,7 +249,7 @@ async def stream_chat_response_basic(
         response_stream = model.generate_content(
             prompt_for_model,
             stream=True,
-            generation_config=genai.types.GenerationConfig(
+            generation_config=GenerationConfig(
                 temperature=0.7,
                 max_output_tokens=800,
             ),
@@ -304,7 +312,7 @@ async def get_chat_response(
                 session_id = create_session()
 
     # Initialize Gemini model
-    model = genai.GenerativeModel(settings.GEMINI_MODEL)
+    model = GenerativeModel(settings.GEMINI_MODEL)
 
     # Convert messages to Gemini format
     conversation_text = ""
@@ -319,7 +327,7 @@ async def get_chat_response(
     # Generate response with Gemini
     response = model.generate_content(
         conversation_text,
-        generation_config=genai.types.GenerationConfig(
+        generation_config=GenerationConfig(
             temperature=request.temperature,
             max_output_tokens=request.max_tokens,
         ),
@@ -361,43 +369,6 @@ async def get_chat_response(
         usage=usage_data,
         session_id=session_id,
     )
-
-
-# Placeholder for future RAG-enhanced chat
-async def get_rag_chat_response(request: RAGRequest) -> ChatResponse:
-    """
-    Process a RAG-enhanced chat request.
-    This is a placeholder for future RAG implementation.
-
-    Args:
-        request: The RAG request containing messages, query, and parameters
-
-    Returns:
-        ChatResponse: The model's response
-    """
-    # For now, just return a message that this feature is coming soon
-    # TODO: add system prompt
-    session_id = request.session_id or "rag_placeholder_session"
-    assistant_message = Message(
-        id=str(uuid.uuid4()),
-        session_id=session_id,
-        role="assistant",
-        content="RAG-enhanced chat is coming soon. This feature will allow the model to reference external documents.",
-        created_at=datetime.now(timezone.utc).isoformat(),
-    )
-
-    return ChatResponse(
-        message=assistant_message,
-        model="placeholder",
-        usage=None,
-        session_id=session_id,
-    )
-
-
-# Placeholder for future voice-related functionality
-async def transcribe_audio():
-    """Placeholder for future voice transcription functionality."""
-    pass
 
 
 async def get_session_history(session_id: str, user_id: Optional[str] = None):
