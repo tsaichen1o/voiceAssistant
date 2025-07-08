@@ -12,7 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
 import '../i18n';
 import { FaPersonCircleQuestion, FaXmark } from "react-icons/fa6";
-import { sendMessage, getChatSessionHistory, saveChatHistory, createChatSession } from '@/services/api';
+import { sendMessage, getChatSessionHistory, saveChatHistory, createChatSession, sendEmailInquiry } from '@/services/api';
 import { useAuth } from '@/context/AuthProvider';
 
 
@@ -26,6 +26,8 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showFAQModal, setShowFAQModal] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [chatMode, setChatMode] = useState<'normal' | 'awaiting_email'>('normal');
+
   const { user } = useAuth();
   const { t } = useTranslation();
   const rawFAQS = t('faq', { returnObjects: true });
@@ -50,8 +52,66 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
     localStorage.setItem('theme', newTheme ? 'dark' : 'light');
   };
 
+  const handleEmailSuggestion = (suggestion: { message: string }) => {
+    setChatMode('awaiting_email');
+    setMessages(prev => {
+      const newMessages = [...prev];
+      const lastMsgIndex = newMessages.findLastIndex(msg => msg.role === 'assistant');
+
+      if (lastMsgIndex !== -1) {
+        newMessages[lastMsgIndex] = {
+          ...newMessages[lastMsgIndex],
+          content: suggestion.message,
+          isStreaming: false,
+        };
+      }
+
+      saveChatHistory(newMessages, chatSessionId)
+        .then(() => console.log("Session history saved on email suggestion."))
+        .catch(error => console.error("Failed to save history on email suggestion:", error));
+      
+      return newMessages;
+    });
+  };
+
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
+
+    if (chatMode === 'awaiting_email') {
+      console.log(`Email provided: ${content}. Sending to backend...`);
+
+      const userProvidedEmail = content;
+
+      try {
+        await sendEmailInquiry(userProvidedEmail, chatSessionId);
+
+        const confirmationMsg: ChatMessage = {
+          id: uuidv4(),
+          session_id: chatSessionId,
+          chat_id: chatSessionId,
+          role: 'assistant',
+          content: `Thank you! Your request has been sent. A human assistant will contact you shortly at: **${userProvidedEmail}**`,
+          created_at: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, confirmationMsg]);
+
+      } catch (error) {
+        console.error("Failed to send email inquiry:", error);
+        const errorMsg: ChatMessage = {
+          id: uuidv4(),
+          session_id: chatSessionId,
+          chat_id: chatSessionId,
+          role: 'assistant',
+          content: `Sorry, there was an error sending your request. Please check your email address and try again. Error: ${(error as Error).message}`,
+          created_at: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, errorMsg]);
+      } finally {
+        setChatMode('normal');
+      }
+
+      return;
+    }
 
     let currentChatId = chatSessionId;
     let messagesWithUserUpdate = [...messages];
@@ -67,6 +127,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
 
     const isNewChat = chatSessionId === 'new';
 
+    // TODO: handle first message in new chat
     if (isNewChat) {
       try {
         const newSession = await createChatSession();
@@ -79,7 +140,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
 
         userMessage.session_id = currentChatId;
         userMessage.chat_id = currentChatId;
-        
+
         messagesWithUserUpdate = [userMessage];
         setMessages(messagesWithUserUpdate);
 
@@ -101,7 +162,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
     } else {
       userMessage.session_id = currentChatId;
       userMessage.chat_id = currentChatId;
-      
+
       messagesWithUserUpdate = [...messages, userMessage];
       setMessages(messagesWithUserUpdate);
     }
@@ -271,6 +332,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
                 <ChatMessagesList
                   messages={messages}
                   onStreamingComplete={handleStreamingComplete}
+                  onEmailSuggestion={handleEmailSuggestion}
                   isDarkMode={isDarkMode}
                   isSidebarOpen={isSidebarOpen}
                 />
@@ -283,9 +345,9 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
                     border
                     transition-all duration-200
                     ${isDarkMode
-                            ? 'bg-gray-800 border-gray-700 text-blue-400 hover:bg-gray-700'
-                            : 'bg-white/90 border-gray-200 text-[#2F70B3] hover:bg-blue-50'
-                          }
+                      ? 'bg-gray-800 border-gray-700 text-blue-400 hover:bg-gray-700'
+                      : 'bg-white/90 border-gray-200 text-[#2F70B3] hover:bg-blue-50'
+                    }
                     z-50
                     cursor-pointer
                     ${isSidebarOpen ? 'sm:block hidden' : 'block'}
@@ -302,6 +364,7 @@ export default function ChatInterface({ chatSessionId }: ChatInterfaceProps) {
           <ChatInput
             onSend={handleSendMessage}
             isDarkMode={isDarkMode}
+            placeholder={chatMode === 'awaiting_email' ? 'Please enter your email address to send the inquiry' : 'Ask anything...'}
           />
         </div>
       </div>

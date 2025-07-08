@@ -57,8 +57,10 @@ export interface Citation {
 }
 
 export interface StreamResponse {
+  type: 'content' | 'email_suggestion' | 'citation';
   content?: string;
   citations?: Citation[];
   error?: string;
   status?: string;
+  message?: string;
 }

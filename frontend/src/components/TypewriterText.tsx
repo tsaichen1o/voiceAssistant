@@ -13,10 +13,11 @@ interface TypewriterTextProps {
   streamUrl: string;
   onComplete?: (finalContent: string, citations?: Citation[]) => void;
   onError?: (error: string) => void;
+  onEmailSuggestion?: (suggestion: { message: string }) => void;
 }
 
 // TODO: citations implementation
-export default function TypewriterText({ streamUrl, onComplete, onError }: TypewriterTextProps) {
+export default function TypewriterText({ streamUrl, onComplete, onError, onEmailSuggestion }: TypewriterTextProps) {
   const [displayedText, setDisplayedText] = useState('');
   // const [citations, setCitations] = useState<Citation[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -71,11 +72,20 @@ export default function TypewriterText({ streamUrl, onComplete, onError }: Typew
 
             try {
               const payload: StreamResponse = JSON.parse(event.data);
-              if (payload.content) {
+              console.log("Raw payload received from backend:", payload);
+              if (payload.type === 'email_suggestion' && onEmailSuggestion) {
+                // If the payload contains an email suggestion, call the callback
+                onEmailSuggestion({ message: payload.message || '' });
+                console.log("Email suggestion received:", payload.message);
+                abortController.abort();
+                return;
+              }
+              if (payload.type === 'content' && payload.content) {
                 accumulatedText += payload.content;
                 setDisplayedText(prev => prev + payload.content);
               }
-              if (payload.citations && payload.citations.length > 0) {
+              // TODO: handle citations links
+              if (payload.type === 'citation' && payload.citations && payload.citations.length > 0) {
                 accumulatedCitations = payload.citations;
                 // setCitations(payload.citations);
               }
@@ -108,7 +118,7 @@ export default function TypewriterText({ streamUrl, onComplete, onError }: Typew
       abortController.abort();
     };
 
-  }, [streamUrl, onComplete, onError]);
+  }, [streamUrl, onComplete, onError, onEmailSuggestion]);
 
   if (error) {
     console.error(error);

@@ -169,3 +169,33 @@ export async function updateChatTitle(sessionId: string, title: string): Promise
   }
   return res.json();
 }
+
+
+/**
+ * Sends the user's inquiry via email when the assistant cannot answer.
+ * @param userEmail The email address provided by the user for follow-up.
+ * @param sessionId The current chat session ID to retrieve the context.
+ * @returns The response from the backend.
+ */
+export async function sendEmailInquiry(userEmail: string, sessionId: string) {
+  const token = await getAccessToken();
+
+  const res = await fetch(`${API_URL}/api/email/send`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      user_email: userEmail,
+      session_id: sessionId,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.detail || 'Failed to send email inquiry.');
+  }
+
+  return res.json();
+}

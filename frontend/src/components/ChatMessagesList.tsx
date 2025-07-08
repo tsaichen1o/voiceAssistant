@@ -10,11 +10,12 @@ import { ThinkingIndicator } from './ThinkingIndicator';
 interface ChatMessagesListProps {
     messages: ChatMessageType[];
     onStreamingComplete: (finalMessage: ChatMessageType) => void;
+    onEmailSuggestion: (suggestion: { message: string }) => void;
     isDarkMode: boolean;
     isSidebarOpen?: boolean;
 }
 
-export default function ChatMessagesList({ messages, onStreamingComplete, isDarkMode, isSidebarOpen = false }: ChatMessagesListProps) {
+export default function ChatMessagesList({ messages, onStreamingComplete, onEmailSuggestion, isDarkMode, isSidebarOpen = false }: ChatMessagesListProps) {
     const bottomRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [showScrollButton, setShowScrollButton] = useState(false);
@@ -62,6 +63,7 @@ export default function ChatMessagesList({ messages, onStreamingComplete, isDark
                         key={message.id}
                         message={message}
                         onStreamingComplete={onStreamingComplete}
+                        onEmailSuggestion={onEmailSuggestion}
                         isDarkMode={isDarkMode}
                     />
                 ))}

@@ -14,9 +14,10 @@ import VoiceAssistantOverlay from './VoiceAssistantOverlay';
 interface ChatInputProps {
   onSend: (content: string) => void;
   isDarkMode: boolean;
+  placeholder?: string;
 }
 
-export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
+export default function ChatInput({ onSend, isDarkMode, placeholder }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [preview, setPreview] = useState<string[]>([]);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -121,7 +122,7 @@ export default function ChatInput({ onSend, isDarkMode }: ChatInputProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             rows={1}
-            placeholder="Ask anything"
+            placeholder={placeholder}
             disabled={isSending}
             className={`w-full pl-2 pr-1 text-base sm:text-lg bg-transparent outline-none resize-none overflow-y-auto max-h-40 ${isDarkMode
                 ? 'text-gray-200 placeholder-gray-500'
