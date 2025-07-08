@@ -39,6 +39,7 @@ python-multipart>=0.0.6
 httpx>=0.25.0
 # For handling JSON Web Tokens
 PyJWT>=2.10.1
+email-validator
 
 # === Testing ===
 pytest>=7.4.0
