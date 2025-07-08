@@ -8,10 +8,11 @@ import ReactMarkdown from 'react-markdown';
 interface ChatMessageProps {
     message: ChatMessageType;
     onStreamingComplete?: (finalMessage: ChatMessageType) => void;
+    onEmailSuggestion?: (suggestion: { message: string }) => void;
     isDarkMode: boolean;
 }
 
-export default function ChatMessage({ message, onStreamingComplete, isDarkMode }: ChatMessageProps) {
+export default function ChatMessage({ message, onStreamingComplete, onEmailSuggestion, isDarkMode }: ChatMessageProps) {
     const isUser = message.role === 'user';
 
     const userBubbleClasses = `
@@ -49,6 +50,7 @@ export default function ChatMessage({ message, onStreamingComplete, isDarkMode }
                     <TypewriterText 
                         streamUrl={message.streamUrl} 
                         onComplete={handleComplete}
+                        onEmailSuggestion={onEmailSuggestion}
                     />
                 ) : (
                     <ReactMarkdown>
