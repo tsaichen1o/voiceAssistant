@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.0-flash"
     GOOGLE_GENAI_USE_VERTEXAI: bool = False
     # Voice model - use experimental version for better real-time voice performance
-    VOICE_MODEL: str = "gemini-2.0-flash-exp"
+    #VOICE_MODEL: str = "gemini-2.0-flash-exp"
+    VOICE_MODEL: str = "gemini-2.0-flash"
     
     # Vertex AI Search settings
     VERTEX_AI_SEARCH_PROJECT_ID: str

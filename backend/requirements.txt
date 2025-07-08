@@ -15,6 +15,20 @@ google-cloud-aiplatform>=1.60.0
 # openai>=1.10.0  # If you are no longer using OpenAI, you can remove this line
 google-cloud-discoveryengine
 
+# === Open Source Voice Services ===
+# OpenAI Whisper for ASR (Automatic Speech Recognition)
+openai-whisper>=20231117
+# Google Text-to-Speech for TTS
+gtts>=2.4.0
+# Audio processing utilities
+pydub>=0.25.1
+# PyTorch for Whisper (if not installed)
+torch>=2.0.0
+# For audio format conversion
+soundfile>=0.12.1
+# NumPy for audio data processing
+numpy>=1.24.0
+
 # === Database & ORM ===
 # SQLAlchemy for database interaction and Alembic for migrations
 sqlalchemy>=2.0.0
