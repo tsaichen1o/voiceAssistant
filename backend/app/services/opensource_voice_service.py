@@ -422,7 +422,14 @@ class OpenSourceVoiceService:
             transcribed_text = await self._transcribe_audio_with_whisper(temp_wav_path)
             
             if not transcribed_text:
-                yield {"type": "text", "data": "🤷 No speech detected in audio", "partial": False}
+                # No speech detected, but still provide voice feedback
+                no_speech_message = "I didn't hear anything. Could you please try speaking again?"
+                yield {"type": "text", "data": no_speech_message, "partial": False}
+                
+                # Generate TTS for the no-speech feedback
+                yield {"type": "text", "data": "🔊 Generating speech feedback...", "partial": True}
+                async for tts_chunk in self._generate_tts_audio(no_speech_message):
+                    yield tts_chunk
                 return
             
             # Step 3: Show what user said
@@ -621,7 +628,7 @@ class OpenSourceVoiceService:
     
     async def _generate_tts_audio(self, text: str, language: str = "en") -> AsyncGenerator[Dict[str, Any], None]:
         """
-        Generate speech audio from text using gTTS.
+        Generate speech audio from text using gTTS with smart text chunking.
         
         Args:
             text: Text to convert to speech
@@ -635,6 +642,7 @@ class OpenSourceVoiceService:
             from gtts import gTTS
             import base64
             import tempfile
+            import re
             
             # Detect language automatically
             detected_lang = self._detect_language(text)
@@ -642,14 +650,42 @@ class OpenSourceVoiceService:
                 language = detected_lang
                 logger.info(f"🌍 Detected language: {language}")
             
-            logger.info(f"🔊 Starting TTS generation for text: '{text[:50]}...'")
+            # Clean and limit text for voice output
+            clean_text = self._prepare_text_for_tts(text)
+            
+            logger.info(f"🔊 Starting TTS generation for text: '{clean_text[:50]}...'")
+            logger.info(f"🔊 Text length: {len(clean_text)} characters")
             logger.info(f"🔊 Using language: {language}")
+            
+            # If text is too long, split into sentences and process the first few
+            if len(clean_text) > 200:  # Limit to ~200 characters for reasonable audio length
+                sentences = re.split(r'[.!?]+', clean_text)
+                # Take first 2-3 sentences that fit within limit
+                selected_text = ""
+                for sentence in sentences:
+                    if len(selected_text + sentence) < 200:
+                        selected_text += sentence.strip() + ". "
+                    else:
+                        break
+                clean_text = selected_text.strip()
+                logger.info(f"🎤 Truncated to: '{clean_text}' ({len(clean_text)} chars)")
+            
+            # For voice, keep it really short - max 100 characters
+            if len(clean_text) > 100:
+                # Find the first sentence that fits in 100 chars
+                sentences = re.split(r'[.!?]+', clean_text)
+                if sentences and len(sentences[0]) <= 100:
+                    clean_text = sentences[0].strip() + "."
+                else:
+                    # Just cut at 100 chars and add period
+                    clean_text = clean_text[:97] + "..."
+                logger.info(f"🎤 Further truncated to: '{clean_text}' ({len(clean_text)} chars)")
             
             # Generate TTS in a thread to avoid blocking
             def generate_tts():
                 try:
-                    # Create gTTS object
-                    tts = gTTS(text=text, lang=language, slow=False)
+                    # Create gTTS object with optimized settings
+                    tts = gTTS(text=clean_text, lang=language, slow=False)
                     
                     # Save to temporary file
                     temp_fd, temp_path = tempfile.mkstemp(suffix='.mp3')
@@ -672,11 +708,21 @@ class OpenSourceVoiceService:
             # Read and encode audio file
             with open(temp_audio_path, 'rb') as audio_file:
                 audio_data = audio_file.read()
-                audio_base64 = base64.b64encode(audio_data).decode('utf-8')
             
-            # Get audio file size for logging
+            # Check audio size and warn if still too large
             audio_size_kb = len(audio_data) / 1024
+            if audio_size_kb > 50:  # Warn if > 50KB
+                logger.warning(f"⚠️ Large audio file: {audio_size_kb:.1f} KB - may cause transmission issues")
+            
+            audio_base64 = base64.b64encode(audio_data).decode('utf-8')
             logger.info(f"✅ TTS audio generated: {audio_size_kb:.1f} KB")
+            
+            # Yield progress message first
+            yield {
+                "type": "text", 
+                "data": f"🔊 Generating speech audio ({audio_size_kb:.1f} KB)...",
+                "partial": True
+            }
             
             # Yield audio data
             yield {
@@ -685,10 +731,10 @@ class OpenSourceVoiceService:
                 "format": "mp3",
                 "sample_rate": 24000,  # gTTS default
                 "partial": False,
-                "text_source": text[:100] + "..." if len(text) > 100 else text
+                "text_source": clean_text[:100] + "..." if len(clean_text) > 100 else clean_text
             }
             
-            # Also yield completion message
+            # Yield completion message
             yield {
                 "type": "text", 
                 "data": f"🔊 Audio generated ({audio_size_kb:.1f} KB, {language})",
@@ -737,6 +783,51 @@ class OpenSourceVoiceService:
         except Exception as e:
             logger.warning(f"⚠️ Language detection failed: {e}")
             return "en"
+    
+    def _prepare_text_for_tts(self, text: str) -> str:
+        """
+        Prepare text for TTS by cleaning and limiting length.
+        
+        Args:
+            text: Raw text from LLM
+            
+        Returns:
+            Cleaned text suitable for TTS
+        """
+        try:
+            # Remove markdown and special formatting
+            import re
+            
+            # Remove markdown links [text](url) -> text
+            text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+            
+            # Remove markdown bold **text** -> text
+            text = re.sub(r'\*\*([^\*]+)\*\*', r'\1', text)
+            
+            # Remove markdown italic *text* -> text
+            text = re.sub(r'\*([^\*]+)\*', r'\1', text)
+            
+            # Remove code blocks ```code``` -> code
+            text = re.sub(r'```[^`]*```', '', text)
+            
+            # Remove inline code `code` -> code
+            text = re.sub(r'`([^`]+)`', r'\1', text)
+            
+            # Remove extra whitespace and newlines
+            text = ' '.join(text.split())
+            
+            # Remove emojis and special characters that might confuse TTS
+            text = re.sub(r'[🎯🔊🧠👤🤖📝🎤✅❌⚠️🌍🔍📄🔚🗑️]', '', text)
+            
+            # Limit to reasonable length for voice - much shorter for better audio size
+            if len(text) > 150:
+                text = text[:147] + "..."
+            
+            return text.strip()
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Text preparation failed: {e}")
+            return text[:200]  # Fallback to simple truncation
     
     async def close_session(self, session_id: str) -> bool:
         """Close and cleanup a voice session."""

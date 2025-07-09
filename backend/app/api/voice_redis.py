@@ -4,17 +4,21 @@ from typing import Dict, Any
 import json
 import asyncio
 
-from app.services.redis_voice_service import redis_voice_service
+# 使用OpenSource Voice Service而不是Redis Voice Service
+from app.services.opensource_voice_service import OpenSourceVoiceService
 from app.utils.supabase_auth import verify_supabase_token
 
-print("🚀 [VOICE REDIS] Importing voice_redis module...")
+print("🚀 [VOICE OPENSOURCE] Importing voice_redis module with OpenSource service...")
 
 router = APIRouter(
     prefix="/api/voice-redis",
     tags=["voice-redis"],
 )
 
-print("✅ [VOICE REDIS] Router created with prefix /api/voice-redis")
+# 创建OpenSource Voice Service实例
+opensource_voice_service = OpenSourceVoiceService()
+
+print("✅ [VOICE OPENSOURCE] Router created with OpenSource Voice Service")
 
 
 @router.get("/events/{user_id}")
@@ -31,8 +35,8 @@ async def voice_events_stream_redis(
         is_audio: Whether to use audio mode ("true" or "false")
         user_info: Authenticated user information
     """
-    print(f"🎯 [VOICE REDIS] GET /events/{user_id} - ENTRY POINT")
-    print(f"Voice client {user_id} connecting via Redis SSE, audio mode: {is_audio}")
+    print(f"🎯 [VOICE OPENSOURCE] GET /events/{user_id} - ENTRY POINT")
+    print(f"Voice client {user_id} connecting via OpenSource SSE, audio mode: {is_audio}")
     print(f"✅ Authenticated user: {user_info.get('email', 'unknown')}")
     
     # Authenticate UserID
@@ -40,9 +44,9 @@ async def voice_events_stream_redis(
         raise HTTPException(status_code=403, detail="User ID mismatch")
     
     try:
-        # Create voice session with Redis
+        # Create voice session with OpenSource Voice Service
         is_audio_mode = is_audio.lower() == "true"
-        session_data = await redis_voice_service.create_session(
+        session_data = await opensource_voice_service.create_session(
             user_id=user_id, 
             is_audio=is_audio_mode
         )
@@ -53,50 +57,23 @@ async def voice_events_stream_redis(
                 # Send session created event
                 yield f"data: {json.dumps({'type': 'session_created', 'session_id': session_id})}\n\n"
                 
-                # If audio mode, process ADK events
-                if is_audio_mode and session_id in redis_voice_service.adk_sessions:
-                    live_events, live_request_queue = redis_voice_service.adk_sessions[session_id]
+                # OpenSource Voice Service uses simpler session management
+                # Just maintain heartbeat for both audio and text modes
+                while True:
+                    current_session = await opensource_voice_service.get_session(session_id)
+                    if not current_session:
+                        break
                     
-                    # Set up concurrent processing of ADK events and heartbeats
-                    last_heartbeat = asyncio.get_event_loop().time()
-                    heartbeat_interval = 30  # seconds
-                    
-                    async for event in live_events:
-                        # Process ADK event
-                        processed_event = await redis_voice_service._process_single_adk_event(event)
-                        if processed_event:
-                            yield f"data: {json.dumps(processed_event)}\n\n"
-                        
-                        # Send heartbeat if needed
-                        current_time = asyncio.get_event_loop().time()
-                        if current_time - last_heartbeat > heartbeat_interval:
-                            current_session = await redis_voice_service.get_session(session_id)
-                            if current_session:
-                                heartbeat_event = {
-                                    "type": "heartbeat",
-                                    "timestamp": current_session['last_active']
-                                }
-                                yield f"data: {json.dumps(heartbeat_event)}\n\n"
-                                last_heartbeat = current_time
-                            else:
-                                break  # Session no longer exists
-                else:
-                    # Text-only mode: just heartbeat
-                    while True:
-                        current_session = await redis_voice_service.get_session(session_id)
-                        if not current_session:
-                            break
-                        
-                        yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': current_session['last_active']})}\n\n"
-                        await asyncio.sleep(30)
+                    yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': current_session['last_active']})}\n\n"
+                    await asyncio.sleep(30)
                     
             except Exception as e:
                 print(f"Error in Redis voice SSE stream: {e}")
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
             finally:
                 # Clean up session
-                await redis_voice_service.close_session(session_id)
-                print(f"Voice client {user_id} disconnected from Redis SSE")
+                await opensource_voice_service.close_session(session_id)
+                print(f"Voice client {user_id} disconnected from OpenSource SSE")
         
         return StreamingResponse(
             event_generator(),
@@ -110,71 +87,71 @@ async def voice_events_stream_redis(
         )
         
     except Exception as e:
-        print(f"Error creating Redis voice session for user {user_id}: {e}")
+        print(f"Error creating OpenSource voice session for user {user_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create voice session: {str(e)}")
 
 
 @router.post("/send/{session_id}")
-async def send_voice_message_redis(
+async def send_voice_message_opensource(
     session_id: str, 
     request: Request,
     user_info: Dict[str, Any] = Depends(verify_supabase_token)
 ):
     """
-    HTTP endpoint for sending messages to the Redis-based voice assistant.
+    HTTP endpoint for sending messages to the OpenSource-based voice assistant.
     
     Args:
         session_id: Session identifier (not user_id!)
         request: HTTP request containing the message
         user_info: Authenticated user information
     """
-    print(f"🔍 [VOICE REDIS] POST /send/{session_id} - START")
-    print(f"✅ Authenticated user sending Redis voice message: {user_info.get('email', 'unknown')}")
+    print(f"🔍 [VOICE OPENSOURCE] POST /send/{session_id} - START")
+    print(f"✅ Authenticated user sending OpenSource voice message: {user_info.get('email', 'unknown')}")
     
     try:
         # Parse the message
-        print(f"🔍 [VOICE REDIS] Parsing request JSON...")
+        print(f"🔍 [VOICE OPENSOURCE] Parsing request JSON...")
         message = await request.json()
         mime_type = message.get("mime_type")
         data = message.get("data")
-        print(f"🔍 [VOICE REDIS] Parsed: mime_type={mime_type}, data_length={len(data) if data else 0}")
+        print(f"🔍 [VOICE OPENSOURCE] Parsed: mime_type={mime_type}, data_length={len(data) if data else 0}")
         
         if not mime_type or not data:
-            print(f"❌ [VOICE REDIS] Missing mime_type or data")
+            print(f"❌ [VOICE OPENSOURCE] Missing mime_type or data")
             raise HTTPException(status_code=400, detail="Missing mime_type or data")
         
         # Verify session exists and belongs to user
-        print(f"🔍 [VOICE REDIS] Verifying session {session_id}...")
-        session_data = await redis_voice_service.get_session(session_id)
+        print(f"🔍 [VOICE OPENSOURCE] Verifying session {session_id}...")
+        session_data = await opensource_voice_service.get_session(session_id)
         if not session_data:
-            print(f"❌ [VOICE REDIS] Session {session_id} not found")
+            print(f"❌ [VOICE OPENSOURCE] Session {session_id} not found")
             raise HTTPException(status_code=404, detail="Session not found")
         
-        print(f"✅ [VOICE REDIS] Session {session_id} found")
+        print(f"✅ [VOICE OPENSOURCE] Session {session_id} found")
         if session_data.get("user_id") != user_info.get('sub'):
-            print(f"❌ [VOICE REDIS] Session does not belong to user")
+            print(f"❌ [VOICE OPENSOURCE] Session does not belong to user")
             raise HTTPException(status_code=403, detail="Session does not belong to user")
         
         # Stream the response back
-        print(f"🔍 [VOICE REDIS] Starting response stream...")
+        print(f"🔍 [VOICE OPENSOURCE] Starting response stream...")
         async def response_generator():
             try:
-                print(f"🔍 [VOICE REDIS] Calling redis_voice_service.send_message...")
-                async for event_data in redis_voice_service.send_message(session_id, data, mime_type):
-                    print(f"🔍 [VOICE REDIS] Got event: {event_data}")
+                print(f"🔍 [VOICE OPENSOURCE] Calling opensource_voice_service.send_message...")
+                async for event_data in opensource_voice_service.send_message(session_id, data, mime_type):
+                    print(f"🔍 [VOICE OPENSOURCE] Got event: {event_data}")
                     yield f"data: {json.dumps(event_data)}\n\n"
                     await asyncio.sleep(0.01)
-                print(f"✅ [VOICE REDIS] Finished processing events")
+                print(f"✅ [VOICE OPENSOURCE] Finished processing events")
             except Exception as e:
-                print(f"❌ [VOICE REDIS] Error in response generator: {e}")
+                print(f"❌ [VOICE OPENSOURCE] Error in response generator: {e}")
                 import traceback
                 traceback.print_exc()
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
         
         if mime_type == "text/plain":
-            print(f"[CLIENT TO REDIS VOICE] Session {session_id}: {data}")
+            print(f"[CLIENT TO OPENSOURCE VOICE] Session {session_id}: {data}")
         elif mime_type == "audio/pcm":
-            print(f"[CLIENT TO REDIS VOICE] Session {session_id}: audio/pcm: {len(data)} chars (base64)")
+            print(f"[CLIENT TO OPENSOURCE VOICE] Session {session_id}: audio/pcm: {len(data)} chars (base64)")
         
         return StreamingResponse(
             response_generator(),
@@ -190,12 +167,12 @@ async def send_voice_message_redis(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON format")
     except Exception as e:
-        print(f"Error sending Redis voice message for session {session_id}: {e}")
+        print(f"Error sending OpenSource voice message for session {session_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
 
 
 @router.get("/sessions/{user_id}")
-async def get_user_redis_voice_sessions(
+async def get_user_opensource_voice_sessions(
     user_id: str,
     user_info: Dict[str, Any] = Depends(verify_supabase_token)
 ):
@@ -207,13 +184,13 @@ async def get_user_redis_voice_sessions(
     if user_info.get('sub') != user_id:
         raise HTTPException(status_code=403, detail="Can only access your own sessions")
     
-    print(f"✅ User {user_info.get('email', 'unknown')} checking their Redis voice sessions")
+    print(f"✅ User {user_info.get('email', 'unknown')} checking their OpenSource voice sessions")
     try:
-        all_sessions = await redis_voice_service.list_active_sessions()
+        all_sessions = await opensource_voice_service.list_active_sessions()
         user_sessions = []
         
         for session_id in all_sessions:
-            session_data = await redis_voice_service.get_session(session_id)
+            session_data = await opensource_voice_service.get_session(session_id)
             if session_data and session_data.get("user_id") == user_id:
                 user_sessions.append({
                     "session_id": session_id,
@@ -233,7 +210,7 @@ async def get_user_redis_voice_sessions(
 
 
 @router.delete("/sessions/{session_id}")
-async def cleanup_redis_voice_session(
+async def cleanup_opensource_voice_session(
     session_id: str,
     user_info: Dict[str, Any] = Depends(verify_supabase_token)
 ):
@@ -245,7 +222,7 @@ async def cleanup_redis_voice_session(
     print(f"✅ User {user_info.get('email', 'unknown')} cleaning up Redis voice session")
     try:
         # Verify session belongs to user
-        session_data = await redis_voice_service.get_session(session_id)
+        session_data = await opensource_voice_service.get_session(session_id)
         if not session_data:
             return {
                 "message": f"Session {session_id} not found",
@@ -256,7 +233,7 @@ async def cleanup_redis_voice_session(
         if session_data.get("user_id") != user_info.get('sub'):
             raise HTTPException(status_code=403, detail="Can only cleanup your own sessions")
         
-        success = await redis_voice_service.close_session(session_id)
+        success = await opensource_voice_service.close_session(session_id)
         
         return {
             "message": f"Cleaned up Redis voice session {session_id}",
@@ -269,12 +246,12 @@ async def cleanup_redis_voice_session(
 
 
 @router.get("/health")
-async def redis_voice_health_check():
+async def opensource_voice_health_check():
     """Health check for Redis voice service."""
     print(f"🎯 [VOICE REDIS] GET /health - ENTRY POINT")
     try:
         # Test Redis connection
-        sessions = await redis_voice_service.list_active_sessions()
+        sessions = await opensource_voice_service.list_active_sessions()
         return {
             "status": "healthy",
             "service": "redis_voice",
