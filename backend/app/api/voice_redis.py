@@ -52,34 +52,40 @@ async def voice_events_stream_redis(
             try:
                 # Send session created event
                 yield f"data: {json.dumps({'type': 'session_created', 'session_id': session_id})}\n\n"
-                
+                while True:
+                    current_session = await redis_voice_service.get_session(session_id)
+                    if not current_session:
+                        break
+                    yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': current_session['last_active']})}\n\n"
+                    await asyncio.sleep(30)
+
                 # If audio mode, process ADK events
-                if is_audio_mode and session_id in redis_voice_service.adk_sessions:
-                    live_events, live_request_queue = redis_voice_service.adk_sessions[session_id]
+                if is_audio_mode:
+                    # live_events, live_request_queue = redis_voice_service.adk_sessions[session_id]
                     
                     # Set up concurrent processing of ADK events and heartbeats
                     last_heartbeat = asyncio.get_event_loop().time()
                     heartbeat_interval = 30  # seconds
                     
-                    async for event in live_events:
-                        # Process ADK event
-                        processed_event = await redis_voice_service._process_single_adk_event(event)
-                        if processed_event:
-                            yield f"data: {json.dumps(processed_event)}\n\n"
+                    # async for event in live_events:
+                    #     # Process ADK event
+                    #     processed_event = await redis_voice_service._process_single_adk_event(event)
+                    #     if processed_event:
+                    #         yield f"data: {json.dumps(processed_event)}\n\n"
                         
                         # Send heartbeat if needed
-                        current_time = asyncio.get_event_loop().time()
-                        if current_time - last_heartbeat > heartbeat_interval:
-                            current_session = await redis_voice_service.get_session(session_id)
-                            if current_session:
-                                heartbeat_event = {
-                                    "type": "heartbeat",
-                                    "timestamp": current_session['last_active']
-                                }
-                                yield f"data: {json.dumps(heartbeat_event)}\n\n"
-                                last_heartbeat = current_time
-                            else:
-                                break  # Session no longer exists
+                    current_time = asyncio.get_event_loop().time()
+                    if current_time - last_heartbeat > heartbeat_interval:
+                        current_session = await redis_voice_service.get_session(session_id)
+                        if current_session:
+                            heartbeat_event = {
+                                "type": "heartbeat",
+                                "timestamp": current_session['last_active']
+                            }
+                            yield f"data: {json.dumps(heartbeat_event)}\n\n"
+                            last_heartbeat = current_time
+                        # else:
+                        #     break  # Session no longer exists
                 else:
                     # Text-only mode: just heartbeat
                     while True:
