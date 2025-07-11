@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from faster_whisper import WhisperModel
 from app.config import settings
 import io
+import logging
 
 import os
 import torch
@@ -52,6 +53,26 @@ def synthesize_speech(text: str) -> bytes:
 
     # 3. 返回 bytes 数据，用于 base64 编码
     return buf.read()
+def safe_synthesize_speech(text: str) -> Optional[bytes]:
+    """
+    合成语音，自动跳过过短、非法或 emoji-only 的文本，防止 TTS 报错。
+    返回 None 表示跳过该句。
+    """
+    cleaned_text = text.strip()
+    
+    # ✅ 跳过空字符串或无意义的符号
+    if not cleaned_text or len(cleaned_text) < 5 or not any(c.isalnum() for c in cleaned_text):
+        logging.warning(f"⏩ Skipping TTS: content too short or non-verbal → '{cleaned_text}'")
+        return None
+
+    # ✅ 可选：过滤掉 emoji 和特殊字符（只保留常用标点）
+    cleaned_text = re.sub(r"[^\w\s.,!?'\"]+", '', cleaned_text)
+
+    try:
+        return synthesize_speech(cleaned_text)
+    except Exception as e:
+        logging.error(f"❌ TTS synthesis failed for: '{cleaned_text}' → {e}")
+        return None
 
 load_dotenv()
 
@@ -197,13 +218,15 @@ class RedisVoiceService:
                 async for event in self._process_text_with_gemini(session_data, content):
                     yield event
                     if event["type"] == "text" and not event.get("partial", False):
-                        audio_out = synthesize_speech(event["data"])
-                        yield {
-                            "type": "audio",
-                            "session_id": session_id,
-                            "mime_type": "audio/wav",
-                            "data": base64.b64encode(audio_out).decode("utf-8")
-                        }
+                        audio_out = safe_synthesize_speech(event["data"])
+                        if audio_out:
+                            yield {
+                                "type": "audio",
+                                "session_id": session_id,
+                                "mime_type": "audio/wav",
+                                "data": base64.b64encode(audio_out).decode("utf-8")
+                            }
+                        
 
             else:
                 yield {"type": "error", "message": f"Unsupported mime_type: {mime_type}"}
