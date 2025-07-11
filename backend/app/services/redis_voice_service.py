@@ -14,6 +14,7 @@ from faster_whisper import WhisperModel
 from app.config import settings
 import io
 import logging
+import re
 
 import os
 import torch
@@ -40,7 +41,7 @@ os.environ["TRANSFORMERS_TRUST_REMOTE_CODE"] = "true"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-tts_model = TTS(model_name="tts_models/en/ljspeech/tacotron2-DCA", progress_bar=False)
+tts_model = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC", progress_bar=False)
 
 def synthesize_speech(text: str) -> bytes:
     # 1. 合成语音波形
@@ -82,7 +83,7 @@ SAMPLE_RATE = 16000
 BUFFER_SECONDS = 1.5
 
 # Initialize faster-whisper once
-whisper_model = WhisperModel("large-v2", compute_type="float32")
+whisper_model = WhisperModel("base", compute_type="float32")
 
 class RedisVoiceService:
     def __init__(self):
@@ -179,7 +180,8 @@ class RedisVoiceService:
                         return
 
                     transcript_text = "".join([seg.text for seg in segments])
-                    transcript_lang = info.language if info else "en"
+                    # transcript_lang = info.language if info else "en"
+                    transcript_lang = "en"
 
                     if not transcript_text.strip():
                         yield {"type": "error", "message": "No speech detected."}
@@ -200,14 +202,25 @@ class RedisVoiceService:
                     async for event in self._process_text_with_gemini(session_data, transcript_text):
                         yield event
                         if event["type"] == "text" and not event.get("partial", False):
-                            audio_out = synthesize_speech(event["data"])
-                            yield {
-                                "type": "audio",
-                                "session_id": session_id,
-                                "mime_type": "audio/wav",
-                                "data": base64.b64encode(audio_out).decode("utf-8")
-                            }
+                            audio_wav_bytes = synthesize_speech(event["data"])
+                            if audio_wav_bytes:
+                                try:
+                                    # 从 wav 字节中读取 PCM 数据
+                                    with io.BytesIO(audio_wav_bytes) as wav_io:
+                                        pcm_array, sample_rate = sf.read(wav_io, dtype='int16')
+                                        pcm_bytes = pcm_array.tobytes()
 
+                                    yield {
+                                        "type": "audio",
+                                        "session_id": session_id,
+                                        "mime_type": "audio/pcm",
+                                        "data": base64.b64encode(pcm_bytes).decode("utf-8")
+                                    }
+                                except Exception as e:
+                                    yield {
+                                        "type": "error",
+                                        "message": f"TTS to PCM conversion error: {str(e)}"
+                                    }
                     self.audio_buffer[session_id] = []
 
             elif mime_type == "text/plain":
