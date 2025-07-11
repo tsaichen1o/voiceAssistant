@@ -18,8 +18,8 @@ google-cloud-discoveryengine
 # === Open Source Voice Services ===
 # OpenAI Whisper for ASR (Automatic Speech Recognition)
 openai-whisper>=20231117
-# Google Text-to-Speech for TTS
-gtts>=2.4.0
+# Microsoft Edge Text-to-Speech for TTS (better than gTTS)
+edge-tts>=6.1.0
 # Audio processing utilities
 pydub>=0.25.1
 # PyTorch for Whisper (if not installed)

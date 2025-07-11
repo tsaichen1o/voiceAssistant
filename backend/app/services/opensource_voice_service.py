@@ -13,7 +13,7 @@ import logging
 try:
     import whisper
     import torch
-    from gtts import gTTS
+    import edge_tts
     import soundfile as sf
     from pydub import AudioSegment
     import google.generativeai as genai
@@ -628,7 +628,7 @@ class OpenSourceVoiceService:
     
     async def _generate_tts_audio(self, text: str, language: str = "en") -> AsyncGenerator[Dict[str, Any], None]:
         """
-        Generate speech audio from text using gTTS with smart text chunking.
+        Generate speech audio from text using Edge TTS with optimized compression.
         
         Args:
             text: Text to convert to speech
@@ -639,7 +639,6 @@ class OpenSourceVoiceService:
         """
         temp_audio_path = None
         try:
-            from gtts import gTTS
             import base64
             import tempfile
             import re
@@ -653,74 +652,57 @@ class OpenSourceVoiceService:
             # Clean and limit text for voice output
             clean_text = self._prepare_text_for_tts(text)
             
-            logger.info(f"🔊 Starting TTS generation for text: '{clean_text[:50]}...'")
+            logger.info(f"🔊 Starting Edge TTS generation for text: '{clean_text[:50]}...'")
             logger.info(f"🔊 Text length: {len(clean_text)} characters")
             logger.info(f"🔊 Using language: {language}")
             
-            # If text is too long, split into sentences and process the first few
-            if len(clean_text) > 200:  # Limit to ~200 characters for reasonable audio length
+            # Edge TTS can handle longer texts better than gTTS, but still limit for performance
+            if len(clean_text) > 300:  # Increased limit since Edge TTS is more efficient
                 sentences = re.split(r'[.!?]+', clean_text)
-                # Take first 2-3 sentences that fit within limit
+                # Take sentences that fit within limit
                 selected_text = ""
                 for sentence in sentences:
-                    if len(selected_text + sentence) < 200:
+                    if len(selected_text + sentence) < 300:
                         selected_text += sentence.strip() + ". "
                     else:
                         break
                 clean_text = selected_text.strip()
                 logger.info(f"🎤 Truncated to: '{clean_text}' ({len(clean_text)} chars)")
             
-            # For voice, keep it really short - max 100 characters
-            if len(clean_text) > 100:
-                # Find the first sentence that fits in 100 chars
-                sentences = re.split(r'[.!?]+', clean_text)
-                if sentences and len(sentences[0]) <= 100:
-                    clean_text = sentences[0].strip() + "."
-                else:
-                    # Just cut at 100 chars and add period
-                    clean_text = clean_text[:97] + "..."
-                logger.info(f"🎤 Further truncated to: '{clean_text}' ({len(clean_text)} chars)")
+            # Select appropriate voice based on language
+            voice = self._get_edge_tts_voice(language)
+            logger.info(f"🎙️ Using Edge TTS voice: {voice}")
             
-            # Generate TTS in a thread to avoid blocking
-            def generate_tts():
-                try:
-                    # Create gTTS object with optimized settings
-                    tts = gTTS(text=clean_text, lang=language, slow=False)
-                    
-                    # Save to temporary file
-                    temp_fd, temp_path = tempfile.mkstemp(suffix='.mp3')
-                    os.close(temp_fd)  # Close file descriptor
-                    
-                    tts.save(temp_path)
-                    return temp_path
-                except Exception as e:
-                    logger.error(f"❌ TTS generation failed: {e}")
-                    return None
+            # Generate TTS using Edge TTS
+            temp_fd, temp_audio_path = tempfile.mkstemp(suffix='.mp3')
+            os.close(temp_fd)  # Close file descriptor immediately
             
-            # Run TTS generation in thread
-            loop = asyncio.get_event_loop()
-            temp_audio_path = await loop.run_in_executor(None, generate_tts)
+            # Use Edge TTS to generate audio
+            communicate = edge_tts.Communicate(clean_text, voice)
+            await communicate.save(temp_audio_path)
             
-            if not temp_audio_path or not os.path.exists(temp_audio_path):
-                yield {"type": "error", "error": "TTS audio generation failed"}
+            if not os.path.exists(temp_audio_path):
+                yield {"type": "error", "error": "Edge TTS audio generation failed"}
                 return
             
             # Read and encode audio file
             with open(temp_audio_path, 'rb') as audio_file:
                 audio_data = audio_file.read()
             
-            # Check audio size and warn if still too large
+            # Check audio size - Edge TTS typically generates smaller files
             audio_size_kb = len(audio_data) / 1024
-            if audio_size_kb > 50:  # Warn if > 50KB
-                logger.warning(f"⚠️ Large audio file: {audio_size_kb:.1f} KB - may cause transmission issues")
+            logger.info(f"✅ Edge TTS audio generated: {audio_size_kb:.1f} KB")
+            
+            # Edge TTS typically generates much smaller files, so this should be fine
+            if audio_size_kb > 100:  # Higher threshold since Edge TTS is more efficient
+                logger.warning(f"⚠️ Large audio file: {audio_size_kb:.1f} KB")
             
             audio_base64 = base64.b64encode(audio_data).decode('utf-8')
-            logger.info(f"✅ TTS audio generated: {audio_size_kb:.1f} KB")
             
             # Yield progress message first
             yield {
                 "type": "text", 
-                "data": f"🔊 Generating speech audio ({audio_size_kb:.1f} KB)...",
+                "data": f"🔊 Generating speech with Edge TTS ({audio_size_kb:.1f} KB)...",
                 "partial": True
             }
             
@@ -729,32 +711,57 @@ class OpenSourceVoiceService:
                 "type": "audio",
                 "data": audio_base64,
                 "format": "mp3",
-                "sample_rate": 24000,  # gTTS default
+                "sample_rate": 24000,  # Edge TTS default
                 "partial": False,
-                "text_source": clean_text[:100] + "..." if len(clean_text) > 100 else clean_text
+                "text_source": clean_text[:100] + "..." if len(clean_text) > 100 else clean_text,
+                "voice_used": voice
             }
             
             # Yield completion message
             yield {
                 "type": "text", 
-                "data": f"🔊 Audio generated ({audio_size_kb:.1f} KB, {language})",
+                "data": f"🔊 Edge TTS audio generated ({audio_size_kb:.1f} KB, {voice})",
                 "partial": False
             }
             
         except Exception as e:
-            logger.error(f"❌ Error in TTS generation: {e}")
+            logger.error(f"❌ Error in Edge TTS generation: {e}")
+            import traceback
+            traceback.print_exc()
             yield {
                 "type": "error",
-                "error": f"TTS generation failed: {str(e)}"
+                "error": f"Edge TTS generation failed: {str(e)}"
             }
         finally:
             # Clean up temporary file
             if temp_audio_path and os.path.exists(temp_audio_path):
                 try:
                     os.unlink(temp_audio_path)
-                    logger.info(f"🗑️ Cleaned up TTS temp file: {temp_audio_path}")
+                    logger.info(f"🗑️ Cleaned up Edge TTS temp file: {temp_audio_path}")
                 except Exception as e:
-                    logger.warning(f"⚠️ Failed to clean up TTS temp file: {e}")
+                    logger.warning(f"⚠️ Failed to clean up Edge TTS temp file: {e}")
+    
+    def _get_edge_tts_voice(self, language: str) -> str:
+        """
+        Get appropriate Edge TTS voice for the given language.
+        
+        Args:
+            language: Language code (en, zh, de, etc.)
+            
+        Returns:
+            Edge TTS voice name
+        """
+        voice_map = {
+            "en": "en-US-AriaNeural",      # English - natural female voice
+            "zh": "zh-CN-XiaoxiaoNeural",  # Chinese - natural female voice
+            "de": "de-DE-KatjaNeural",     # German - natural female voice
+            "es": "es-ES-ElviraNeural",    # Spanish - natural female voice
+            "fr": "fr-FR-DeniseNeural",    # French - natural female voice
+            "ja": "ja-JP-NanamiNeural",    # Japanese - natural female voice
+            "ko": "ko-KR-SunHiNeural",     # Korean - natural female voice
+        }
+        
+        return voice_map.get(language, "en-US-AriaNeural")  # Default to English
     
     def _detect_language(self, text: str) -> str:
         """
@@ -787,6 +794,7 @@ class OpenSourceVoiceService:
     def _prepare_text_for_tts(self, text: str) -> str:
         """
         Prepare text for TTS by cleaning and limiting length.
+        Edge TTS can handle longer texts more efficiently than gTTS.
         
         Args:
             text: Raw text from LLM
@@ -819,9 +827,14 @@ class OpenSourceVoiceService:
             # Remove emojis and special characters that might confuse TTS
             text = re.sub(r'[🎯🔊🧠👤🤖📝🎤✅❌⚠️🌍🔍📄🔚🗑️]', '', text)
             
-            # Limit to reasonable length for voice - much shorter for better audio size
-            if len(text) > 150:
-                text = text[:147] + "..."
+            # Edge TTS can handle longer texts more efficiently - increased limit
+            if len(text) > 250:  # Increased from 150 to 250
+                # Try to cut at sentence boundary
+                sentences = re.split(r'[.!?]+', text)
+                if sentences and len(sentences[0]) <= 250:
+                    text = sentences[0].strip() + "."
+                else:
+                    text = text[:247] + "..."
             
             return text.strip()
             
