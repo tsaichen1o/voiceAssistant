@@ -63,12 +63,12 @@ def safe_synthesize_speech(text: str) -> Optional[bytes]:
     """
     cleaned_text = text.strip()
     
-    # ✅ 跳过空字符串或无意义的符号
-    if not cleaned_text or len(cleaned_text) < 5 or not any(c.isalnum() for c in cleaned_text):
+    # From len(cleaned_text) < 5 to len(cleaned_text) < 10 or a value that suits your needs.
+    if not cleaned_text or len(cleaned_text) < 10 or not any(c.isalnum() for c in cleaned_text):
         logging.warning(f"⏩ Skipping TTS: content too short or non-verbal → '{cleaned_text}'")
         return None
 
-    # ✅ 可选：过滤掉 emoji 和特殊字符（只保留常用标点）
+    # Filter out emoji and special characters
     cleaned_text = re.sub(r"[^\w\s.,!?'\"]+", '', cleaned_text)
 
     try:
@@ -262,13 +262,13 @@ class RedisVoiceService:
             try:
                 model = GenerativeModel(
                     model_name=settings.VOICE_MODEL,
-                    system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging."
+                    system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging. Do not use ANY emojis in your responses."
                 )
             except Exception as e:
                 print(f"⚠️ Voice model {settings.VOICE_MODEL} failed, falling back to {settings.GEMINI_MODEL}: {e}")
                 model = GenerativeModel(
                     model_name=settings.GEMINI_MODEL,
-                    system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging."
+                    system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging. Do not use ANY emojis in your responses."
                 )
 
             chat = model.start_chat(history=[
@@ -287,15 +287,29 @@ class RedisVoiceService:
                         "data": chunk.text,
                         "partial": True
                     }
-
+                    
+            emoji_pattern = re.compile(
+                "["
+                "\U0001F600-\U0001F64F"  # emoticons
+                "\U0001F300-\U0001F5FF"  # symbols & pictographs
+                "\U0001F680-\U0001F6FF"  # transport & map symbols
+                "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                "\U00002702-\U000027B0"
+                "\U000024C2-\U0001F251"
+                "]+",
+                flags=re.UNICODE,
+            )
+            
+            filtered_response = emoji_pattern.sub(r'', full_response)
+            
             yield {
                 "type": "text", 
-                "data": full_response,
+                "data": filtered_response,
                 "partial": False
             }
 
             history.append({"role": "user", "content": content})
-            history.append({"role": "model", "content": full_response})
+            history.append({"role": "model", "content": filtered_response})
             await self.update_session(session_data["session_id"], {"conversation_history": history})
 
         except Exception as e:
