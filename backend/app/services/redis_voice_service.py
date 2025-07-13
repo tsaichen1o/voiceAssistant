@@ -9,7 +9,8 @@ import redis.asyncio as redis
 from typing import Dict, Optional, AsyncGenerator, Any
 from datetime import datetime
 from dotenv import load_dotenv
-
+from google.generativeai.client import configure
+from google.generativeai.generative_models import GenerativeModel
 from faster_whisper import WhisperModel
 from app.config import settings
 import io
@@ -49,7 +50,8 @@ def synthesize_speech(text: str) -> bytes:
 
     # 2. 写入内存 buffer，保存为 WAV 格式
     buf = io.BytesIO()
-    sf.write(buf, waveform, samplerate=tts_model.synthesizer.output_sample_rate, format="WAV")
+    sample_rate = tts_model.synthesizer.output_sample_rate if hasattr(tts_model, "synthesizer") and tts_model.synthesizer and hasattr(tts_model.synthesizer, "output_sample_rate") else 22050
+    sf.write(buf, waveform, samplerate=sample_rate, format="WAV")
     buf.seek(0)
 
     # 3. 返回 bytes 数据，用于 base64 编码
@@ -249,21 +251,22 @@ class RedisVoiceService:
             yield {"type": "error", "message": str(e)}
 
 
+    # TODO: Add Vertex AI Search integration
+    # TODO: Handle emoji
     async def _process_text_with_gemini(self, session_data: Dict[str, Any], content: str) -> AsyncGenerator[Dict[str, Any], None]:
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=settings.GEMINI_API_KEY)
+            configure(api_key=settings.GEMINI_API_KEY)
 
             history = session_data.get("conversation_history", [])
 
             try:
-                model = genai.GenerativeModel(
+                model = GenerativeModel(
                     model_name=settings.VOICE_MODEL,
                     system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging."
                 )
             except Exception as e:
                 print(f"⚠️ Voice model {settings.VOICE_MODEL} failed, falling back to {settings.GEMINI_MODEL}: {e}")
-                model = genai.GenerativeModel(
+                model = GenerativeModel(
                     model_name=settings.GEMINI_MODEL,
                     system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging."
                 )
