@@ -106,8 +106,8 @@ python -m app.tests.test_reports_analysis
 ```
 It should show the following information in the CLI
 ```bash
-✅ Correct (True) 101
-❌ Incorrect (False) 5
-📊 Total 106
-Acucracy rate: 0.9528301886792453%
+✅ Correct (True): 101
+❌ Incorrect (False): 5
+📊 Total: 106
+📈 Accuracy rate: 0.9528301886792453%
 ```

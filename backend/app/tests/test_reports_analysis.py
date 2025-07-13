@@ -27,12 +27,12 @@ def count_assessments_from_jsonl(file_path: str) -> None:
         print(f"❌ File not found: {file_path}")
         return
     
-    print("✅ Correct (True)", str(true_count))
-    print("❌ Incorrect (False)", str(false_count))
-    print("📊 Total", str(total))
+    print(f"✅ Correct (True): {true_count}")
+    print(f"❌ Incorrect (False): {false_count}")
+    print(f"📊 Total: {total}")
 
     accuracy = true_count / total
-    print(f"Acucracy rate: {accuracy}%")
+    print(f"📈 Accuracy rate: {accuracy}%")
 
 if __name__ == "__main__":
     count_assessments_from_jsonl(r"./app/tests/test_results/test_reports.jsonl")
