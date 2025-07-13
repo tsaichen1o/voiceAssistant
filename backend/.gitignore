@@ -23,3 +23,4 @@ Icon
 .coverage.xml.*
 .coverage.xml.*.*
 .coverage.xml.*.*.*
+venv/

@@ -59,6 +59,14 @@ REDIS_URL=redis://localhost:6379
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
+# Email settings
+EMAIL_ADDRESS=the_address_to_send_email_from
+EMAIL_PASSWORD=the_api_password_of_the_email
+# The address can be the same
+DEFAULT_EMAIL_RECIPIENT=the_address_to_receive_email_from
+TUITION_EMAIL_RECIPIENT=the_address_to_receive_email_from
+APPLICATION_EMAIL_RECIPIENT=the_address_to_receive_email_from
+PROGRAM_EMAIL_RECIPIENT=the_address_to_receive_email_from
 ```
 
 ### 3. Database Initialization
