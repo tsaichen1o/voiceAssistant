@@ -11,6 +11,11 @@ made with the TUM chatbot while testing. The chat history has more questions
 than the `test_reports.jsonl` because it starts working before the functionality 
 to save data to `test_reports_agent` works. We regards all these information as 
 valuable, so we save all of that for further investigation.
+
+To analyse the performance of the TUM chatbot, we use `backend\app\tests\test_reports_analysis`. 
+This file will count the number of times that TUM chatbot answers correctly, 
+and the number of times its answer is wrong. Then it will calculate the accuracy
+rate of the model.
 ### Test methods
 We test the accuracy of chatbot's answers by using Google's Agent Development 
 Kit (ADK) Agent. We call the agent as `test_chatbot_agent`. The noteworthy 
@@ -95,3 +100,14 @@ cd backend
 python -m app.tests.test_tum_chatbot
 ```
 7. See the results in `backend\app\tests\test_results` folder.
+8. Analyse the TUM chatbot performance by running this:
+```bash
+python -m app.tests.test_reports_analysis
+```
+It should show the following information in the CLI
+```bash
+✅ Correct (True) 101
+❌ Incorrect (False) 5
+📊 Total 106
+Acucracy rate: 0.9528301886792453%
+```
