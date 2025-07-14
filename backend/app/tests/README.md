@@ -72,16 +72,16 @@ TUITION_EMAIL_RECIPIENT=the_address_to_receive_email_from
 APPLICATION_EMAIL_RECIPIENT=the_address_to_receive_email_from
 PROGRAM_EMAIL_RECIPIENT=the_address_to_receive_email_from
 ```
-2. Install Dependencies
+2. Create virtual environment
+```bash
+python -m venv venv
+```
+
+3. Install Dependencies
 
 ```bash
 # Install dependencies
 pip install -r requirements.txt
-```
-
-3. Create virtual environment
-```bash
-python -m venv venv
 ```
 4. Actiate virtual environment
 ```bash
