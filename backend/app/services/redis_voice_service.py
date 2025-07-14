@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import base64
 import asyncio
@@ -13,70 +14,15 @@ from google.generativeai.client import configure
 from google.generativeai.generative_models import GenerativeModel
 from faster_whisper import WhisperModel
 from app.config import settings
-import io
-import logging
-import re
 
-import os
-import torch
-from TTS.api import TTS
-import whisper
-from faster_whisper import WhisperModel
+# Rmemainder: comment the VOICE_MODEL line in .env file
 
-import collections
+# Ensure ffmpeg is in the PATH for soundfile to work correctly
+# If it is already set in your environment, this line can be removed
 os.environ["PATH"] += os.pathsep + r"C:\Users\huhan\App\ffmpeg\bin"
 
-from torch.serialization import add_safe_globals
-from TTS.tts.configs.xtts_config import XttsConfig
-from TTS.tts.models.xtts import XttsAudioConfig, XttsArgs
-from TTS.config.shared_configs import BaseDatasetConfig
-add_safe_globals([collections.defaultdict])
-add_safe_globals([dict])
-
-add_safe_globals([XttsConfig, XttsAudioConfig, BaseDatasetConfig, XttsArgs])
-
-from TTS.utils.radam import RAdam
-
-add_safe_globals([RAdam])
-os.environ["TRANSFORMERS_TRUST_REMOTE_CODE"] = "true"
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-tts_model = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC", progress_bar=False)
-
-def synthesize_speech(text: str) -> bytes:
-    # 1. 合成语音波形
-    waveform = tts_model.tts(text)
-
-    # 2. 写入内存 buffer，保存为 WAV 格式
-    buf = io.BytesIO()
-    sample_rate = tts_model.synthesizer.output_sample_rate if hasattr(tts_model, "synthesizer") and tts_model.synthesizer and hasattr(tts_model.synthesizer, "output_sample_rate") else 22050
-    sf.write(buf, waveform, samplerate=sample_rate, format="WAV")
-    buf.seek(0)
-
-    # 3. 返回 bytes 数据，用于 base64 编码
-    return buf.read()
-
-
-def safe_synthesize_speech(text: str) -> Optional[bytes]:
-    """
-    Automatically handle empty or invalid text for TTS synthesis.
-    Returns None if the text is too short or invalid.
-    """
-    cleaned_text = text.strip()
-    
-    if not cleaned_text or len(cleaned_text) < 2 or not any(c.isalnum() for c in cleaned_text):
-        logging.warning(f"⏩ Skipping TTS: content too short or non-verbal → '{cleaned_text}'")
-        return None
-
-    try:
-        if len(cleaned_text) > 300:
-             logging.warning(f"⏩ Skipping TTS: content too long > 300 chars → '{cleaned_text[:50]}...'")
-             return None
-        return synthesize_speech(cleaned_text)
-    except Exception as e:
-        logging.error(f"❌ TTS synthesis failed for: '{cleaned_text}' → {e}")
-        return None
+from app.services.asr import transcribe
+from app.services.tts import safe_synthesize_speech
 
 load_dotenv()
 
@@ -84,9 +30,6 @@ APP_NAME = "Voice Assistant"
 SESSION_EXPIRY = 3600  # 1 hour 
 SAMPLE_RATE = 16000
 BUFFER_SECONDS = 5
-
-# Initialize faster-whisper once
-whisper_model = WhisperModel("base", compute_type="float32")
 
 class RedisVoiceService:
     def __init__(self):
@@ -139,7 +82,7 @@ class RedisVoiceService:
 
     async def send_message(self, session_id: str, content: str, mime_type: str = "audio/pcm") -> AsyncGenerator[Dict[str, Any], None]:
         try:
-            # ✅ 校验空 content
+            # ✅ content validation
             if not content or not isinstance(content, str) or content.strip() == "":
                 yield {"type": "error", "message": "'content' must not be empty."}
                 return
@@ -156,7 +99,7 @@ class RedisVoiceService:
                     yield {"type": "error", "message": "Failed to decode base64 audio."}
                     return
 
-                if len(audio_bytes) < 512:  # ✅ 防止无效音频
+                if len(audio_bytes) < 512:  # ✅ Minimum length check
                     yield {"type": "error", "message": "Audio data too short."}
                     return
 
@@ -175,16 +118,12 @@ class RedisVoiceService:
                     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_wav:
                         sf.write(tmp_wav.name, buffer, SAMPLE_RATE)
 
-                    # ✅ 防御性调用 whisper
+                    # import fast whisper
                     try:
-                        segments, info = whisper_model.transcribe(tmp_wav.name, beam_size=5)
+                        transcript_text, transcript_lang = transcribe(buffer, sample_rate=SAMPLE_RATE)
                     except Exception as e:
                         yield {"type": "error", "message": f"Whisper error: {str(e)}"}
                         return
-
-                    transcript_text = "".join([seg.text for seg in segments])
-                    # transcript_lang = info.language if info else "en"
-                    transcript_lang = "en"
 
                     if not transcript_text.strip():
                         yield {"type": "error", "message": "No speech detected."}
@@ -201,7 +140,7 @@ class RedisVoiceService:
                         "partial": False
                     }
 
-                    # ✅ Gemini流式输出
+                    # ✅ Gemini AI text processing
                     async for event in self._process_text_with_gemini(session_data, transcript_text):
                         yield event
                         
@@ -214,16 +153,6 @@ class RedisVoiceService:
 
                 async for event in self._process_text_with_gemini(session_data, content):
                     yield event
-                    if event["type"] == "text" and not event.get("partial", False):
-                        audio_out = safe_synthesize_speech(event["data"])
-                        if audio_out:
-                            yield {
-                                "type": "audio",
-                                "session_id": session_id,
-                                "mime_type": "audio/wav",
-                                "data": base64.b64encode(audio_out).decode("utf-8")
-                            }
-                        
 
             else:
                 yield {"type": "error", "message": f"Unsupported mime_type: {mime_type}"}
@@ -235,25 +164,63 @@ class RedisVoiceService:
 
     # TODO: Add Vertex AI Search integration
     async def _process_text_with_gemini(self, session_data: Dict[str, Any], content: str) -> AsyncGenerator[Dict[str, Any], None]:
+        from google.api_core.client_options import ClientOptions
+        from google.cloud import discoveryengine_v1 as discoveryengine
+        from google.generativeai.types import GenerationConfig
         try:
             configure(api_key=settings.GEMINI_API_KEY)
-            history = session_data.get("conversation_history", [])
+            # history = session_data.get("conversation_history", [])
 
-            try:
-                model = GenerativeModel(
-                    model_name=settings.VOICE_MODEL,
-                    system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging. Do not use ANY emojis in your responses."
+            # ========== 1. Vertex AI Search ==========
+            project_id = settings.VERTEX_AI_SEARCH_PROJECT_ID
+            location = settings.VERTEX_AI_SEARCH_LOCATION
+            engine_id = settings.VERTEX_AI_SEARCH_ENGINE_ID
+            client_options = (
+                ClientOptions(api_endpoint=f"{location}-discoveryengine.googleapis.com")
+                if location != "global" else None
+            )
+            client = discoveryengine.SearchServiceClient(client_options=client_options)
+            serving_config = f"projects/{project_id}/locations/{location}/collections/default_collection/engines/{engine_id}/servingConfigs/default_config"
+
+            content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
+                summary_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec(
+                    summary_result_count=5,
+                    include_citations=False,
+                    ignore_adversarial_query=True,
+                    ignore_non_summary_seeking_query=True,
                 )
-            except Exception as e:
-                print(f"⚠️ Voice model {settings.VOICE_MODEL} failed, falling back to {settings.GEMINI_MODEL}: {e}")
-                model = GenerativeModel(
-                    model_name=settings.GEMINI_MODEL,
-                    system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging. Do not use ANY emojis in your responses."
-                )
+            )
 
-            chat = model.start_chat(history=[{"role": msg["role"], "parts": [msg["content"]]} for msg in history])
-            response = chat.send_message(content, stream=True)
+            request = discoveryengine.SearchRequest(
+                serving_config=serving_config,
+                query=content,
+                page_size=10,
+                content_search_spec=content_search_spec,
+                spell_correction_spec=discoveryengine.SearchRequest.SpellCorrectionSpec(
+                    mode=discoveryengine.SearchRequest.SpellCorrectionSpec.Mode.AUTO
+                ),
+            )
 
+            search_response = client.search(request=request)
+            summary_text = getattr(search_response.summary, "summary_text", "") if hasattr(search_response, "summary") else ""
+
+            # ========== 2. Prompt ==========
+            prompt = (
+                "You are a helpful voice assistant. Respond naturally and helpfully. Avoid emojis.\n\n"
+                f"--- Context ---\n{summary_text}\n--- END CONTEXT ---\n\n"
+                f"User question: {content}"
+            )
+            # ========== 3. Gemini generation ==========
+            model = GenerativeModel(
+                model_name=settings.GEMINI_MODEL,
+                system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging. Do not use ANY emojis in your responses."
+            )
+            chat = model.start_chat(history=[
+                {"role": "user", "parts": [content]}
+            ])
+            response = chat.send_message(prompt, stream=True)
+
+            # ========== 4. Audio streaming synthesis + output ==========
             sentence_buffer = ""
             full_response_text = ""
             sentence_delimiters = re.compile(r'(?<=[.!?])\s*')
@@ -261,48 +228,44 @@ class RedisVoiceService:
             for chunk in response:
                 if not chunk.text:
                     continue
-                
-                yield { "type": "text", "data": chunk.text, "partial": True }
-                
+                yield {"type": "text", "data": chunk.text, "partial": True}
                 sentence_buffer += chunk.text
                 full_response_text += chunk.text
-                
-                sentences = sentence_delimiters.split(sentence_buffer)
 
+                sentences = sentence_delimiters.split(sentence_buffer)
                 if len(sentences) > 1:
                     for sentence in sentences[:-1]:
-                        sentence = sentence.strip()
-                        if sentence:
-                            audio_out = safe_synthesize_speech(sentence)
-                            if audio_out:
+                        if sentence.strip():
+                            audio = safe_synthesize_speech(sentence.strip())
+                            if audio:
                                 yield {
                                     "type": "audio",
                                     "session_id": session_data["session_id"],
                                     "mime_type": "audio/wav",
-                                    "data": base64.b64encode(audio_out).decode("utf-8")
+                                    "data": base64.b64encode(audio).decode("utf-8")
                                 }
-                    
                     sentence_buffer = sentences[-1]
 
             if sentence_buffer.strip():
-                final_sentence = sentence_buffer.strip()
-                audio_out = safe_synthesize_speech(final_sentence)
-                if audio_out:
+                final_audio = safe_synthesize_speech(sentence_buffer.strip())
+                if final_audio:
                     yield {
                         "type": "audio",
                         "session_id": session_data["session_id"],
                         "mime_type": "audio/wav",
-                        "data": base64.b64encode(audio_out).decode("utf-8")
+                        "data": base64.b64encode(final_audio).decode("utf-8")
                     }
-            
-            yield { "type": "text", "data": "", "partial": False }
 
+            yield {"type": "text", "data": "", "partial": False}
+
+            # ========== 5. Save session ==========
+            history = session_data.get("conversation_history", [])
             history.append({"role": "user", "content": content})
             history.append({"role": "model", "content": full_response_text})
             await self.update_session(session_data["session_id"], {"conversation_history": history})
 
         except Exception as e:
-            print(f"❌ Error in Gemini text processing: {e}")
+            print(f"❌ Error in _process_text_with_gemini: {e}")
             yield {"type": "error", "message": str(e)}
 
     async def close_session(self, session_id: str) -> bool:

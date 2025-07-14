@@ -14,12 +14,6 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.0-flash"
     GOOGLE_GENAI_USE_VERTEXAI: bool = False
 
-    # Whisper model（Choose：tiny, base, small, medium, large）
-    WHISPER_MODEL: str = "base"
-
-    # Coqui TTS model（Choose: tts_models/en/ljspeech/tacotron2-DDC）
-    VOICE_MODEL: str = "tts_models/en/ljspeech/tacotron2-DCA"
-
     # Voice model - use experimental version for better real-time voice performance
     # VOICE_MODEL: str = "gemini-2.0-flash-exp"
     
