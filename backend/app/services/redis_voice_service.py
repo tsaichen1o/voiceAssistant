@@ -68,21 +68,24 @@ def safe_synthesize_speech(text: str) -> Optional[bytes]:
         logging.warning(f"⏩ Skipping TTS: content too short or non-verbal → '{cleaned_text}'")
         return None
 
-    # Filter out emoji and special characters
-    cleaned_text = re.sub(r"[^\w\s.,!?'\"]+", '', cleaned_text)
-
-    try:
-        return synthesize_speech(cleaned_text)
-    except Exception as e:
-        logging.error(f"❌ TTS synthesis failed for: '{cleaned_text}' → {e}")
-        return None
+    sentences = re.split(r'[.!?]', cleaned_text)
+    audio_out = io.BytesIO()
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if sentence and len(sentence) < 200:  # 避免過長
+            try:
+                wav_bytes = synthesize_speech(sentence)
+                audio_out.write(wav_bytes)
+            except Exception as e:
+                logging.error(f"TTS failed for '{sentence}': {e}")
+    return audio_out.getvalue() if audio_out.tell() > 0 else None
 
 load_dotenv()
 
 APP_NAME = "Voice Assistant"
 SESSION_EXPIRY = 3600  # 1 hour 
 SAMPLE_RATE = 16000
-BUFFER_SECONDS = 1.5
+BUFFER_SECONDS = 5
 
 # Initialize faster-whisper once
 whisper_model = WhisperModel("base", compute_type="float32")
