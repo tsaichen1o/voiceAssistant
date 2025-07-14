@@ -56,29 +56,27 @@ def synthesize_speech(text: str) -> bytes:
 
     # 3. 返回 bytes 数据，用于 base64 编码
     return buf.read()
+
+
 def safe_synthesize_speech(text: str) -> Optional[bytes]:
     """
-    合成语音，自动跳过过短、非法或 emoji-only 的文本，防止 TTS 报错。
-    返回 None 表示跳过该句。
+    Automatically handle empty or invalid text for TTS synthesis.
+    Returns None if the text is too short or invalid.
     """
     cleaned_text = text.strip()
     
-    # From len(cleaned_text) < 5 to len(cleaned_text) < 10 or a value that suits your needs.
-    if not cleaned_text or len(cleaned_text) < 10 or not any(c.isalnum() for c in cleaned_text):
+    if not cleaned_text or len(cleaned_text) < 2 or not any(c.isalnum() for c in cleaned_text):
         logging.warning(f"⏩ Skipping TTS: content too short or non-verbal → '{cleaned_text}'")
         return None
 
-    sentences = re.split(r'[.!?]', cleaned_text)
-    audio_out = io.BytesIO()
-    for sentence in sentences:
-        sentence = sentence.strip()
-        if sentence and len(sentence) < 200:  # 避免過長
-            try:
-                wav_bytes = synthesize_speech(sentence)
-                audio_out.write(wav_bytes)
-            except Exception as e:
-                logging.error(f"TTS failed for '{sentence}': {e}")
-    return audio_out.getvalue() if audio_out.tell() > 0 else None
+    try:
+        if len(cleaned_text) > 300:
+             logging.warning(f"⏩ Skipping TTS: content too long > 300 chars → '{cleaned_text[:50]}...'")
+             return None
+        return synthesize_speech(cleaned_text)
+    except Exception as e:
+        logging.error(f"❌ TTS synthesis failed for: '{cleaned_text}' → {e}")
+        return None
 
 load_dotenv()
 
@@ -206,26 +204,7 @@ class RedisVoiceService:
                     # ✅ Gemini流式输出
                     async for event in self._process_text_with_gemini(session_data, transcript_text):
                         yield event
-                        if event["type"] == "text" and not event.get("partial", False):
-                            audio_wav_bytes = synthesize_speech(event["data"])
-                            if audio_wav_bytes:
-                                try:
-                                    # 从 wav 字节中读取 PCM 数据
-                                    with io.BytesIO(audio_wav_bytes) as wav_io:
-                                        pcm_array, sample_rate = sf.read(wav_io, dtype='int16')
-                                        pcm_bytes = pcm_array.tobytes()
-
-                                    yield {
-                                        "type": "audio",
-                                        "session_id": session_id,
-                                        "mime_type": "audio/pcm",
-                                        "data": base64.b64encode(pcm_bytes).decode("utf-8")
-                                    }
-                                except Exception as e:
-                                    yield {
-                                        "type": "error",
-                                        "message": f"TTS to PCM conversion error: {str(e)}"
-                                    }
+                        
                     self.audio_buffer[session_id] = []
 
             elif mime_type == "text/plain":
@@ -255,11 +234,9 @@ class RedisVoiceService:
 
 
     # TODO: Add Vertex AI Search integration
-    # TODO: Handle emoji
     async def _process_text_with_gemini(self, session_data: Dict[str, Any], content: str) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             configure(api_key=settings.GEMINI_API_KEY)
-
             history = session_data.get("conversation_history", [])
 
             try:
@@ -274,45 +251,54 @@ class RedisVoiceService:
                     system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging. Do not use ANY emojis in your responses."
                 )
 
-            chat = model.start_chat(history=[
-                {"role": msg["role"], "parts": [msg["content"]]} 
-                for msg in history
-            ])
-
+            chat = model.start_chat(history=[{"role": msg["role"], "parts": [msg["content"]]} for msg in history])
             response = chat.send_message(content, stream=True)
 
-            full_response = ""
+            sentence_buffer = ""
+            full_response_text = ""
+            sentence_delimiters = re.compile(r'(?<=[.!?])\s*')
+
             for chunk in response:
-                if chunk.text:
-                    full_response += chunk.text
-                    yield {
-                        "type": "text",
-                        "data": chunk.text,
-                        "partial": True
-                    }
+                if not chunk.text:
+                    continue
+                
+                yield { "type": "text", "data": chunk.text, "partial": True }
+                
+                sentence_buffer += chunk.text
+                full_response_text += chunk.text
+                
+                sentences = sentence_delimiters.split(sentence_buffer)
+
+                if len(sentences) > 1:
+                    for sentence in sentences[:-1]:
+                        sentence = sentence.strip()
+                        if sentence:
+                            audio_out = safe_synthesize_speech(sentence)
+                            if audio_out:
+                                yield {
+                                    "type": "audio",
+                                    "session_id": session_data["session_id"],
+                                    "mime_type": "audio/wav",
+                                    "data": base64.b64encode(audio_out).decode("utf-8")
+                                }
                     
-            emoji_pattern = re.compile(
-                "["
-                "\U0001F600-\U0001F64F"  # emoticons
-                "\U0001F300-\U0001F5FF"  # symbols & pictographs
-                "\U0001F680-\U0001F6FF"  # transport & map symbols
-                "\U0001F1E0-\U0001F1FF"  # flags (iOS)
-                "\U00002702-\U000027B0"
-                "\U000024C2-\U0001F251"
-                "]+",
-                flags=re.UNICODE,
-            )
+                    sentence_buffer = sentences[-1]
+
+            if sentence_buffer.strip():
+                final_sentence = sentence_buffer.strip()
+                audio_out = safe_synthesize_speech(final_sentence)
+                if audio_out:
+                    yield {
+                        "type": "audio",
+                        "session_id": session_data["session_id"],
+                        "mime_type": "audio/wav",
+                        "data": base64.b64encode(audio_out).decode("utf-8")
+                    }
             
-            filtered_response = emoji_pattern.sub(r'', full_response)
-            
-            yield {
-                "type": "text", 
-                "data": filtered_response,
-                "partial": False
-            }
+            yield { "type": "text", "data": "", "partial": False }
 
             history.append({"role": "user", "content": content})
-            history.append({"role": "model", "content": filtered_response})
+            history.append({"role": "model", "content": full_response_text})
             await self.update_session(session_data["session_id"], {"conversation_history": history})
 
         except Exception as e:
