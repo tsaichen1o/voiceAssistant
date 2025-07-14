@@ -12,9 +12,16 @@ import { getAccessToken } from '@/services/api';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useAuth } from '@/context/AuthProvider';
 
+
+interface TranscriptData {
+  inline_data?: unknown;
+  language?: string;
+  text?: string;
+}
+
 interface VoiceEvent {
-  type: 'text' | 'audio' | 'session_created' | 'heartbeat' | 'error';
-  data?: string;
+  type: 'text' | 'audio' | 'session_created' | 'transcript' | 'heartbeat' | 'error';
+  data?: TranscriptData | string;
   mime_type?: string;
   text?: string;
   session_id?: string;
@@ -30,6 +37,7 @@ interface VoiceAssistantOverlayProps {
   isDarkMode: boolean;
 }
 
+
 export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: VoiceAssistantOverlayProps) {
   const { user } = useAuth();
   const [paused, setPaused] = useState(false);
@@ -37,20 +45,23 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   const [isAudioMode, setIsAudioMode] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [lastResponse, setLastResponse] = useState<string>('');
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const sessionIdRef = useRef<string | null>(null);
-  const isSendingRef = useRef(false);
-  
+  const [transcript, setTranscript] = useState<string>('');
+
   const volume = useMicrophoneVolume(isOpen && !paused && isAudioMode);
   const userId = user?.id;
-  
-  // Debug sessionId changes
+  const sessionIdRef = useRef<string | null>(null);
+
+  const isSendingRef = useRef(false);
+  const audioPlayerNodeRef = useRef<AudioWorkletNode | null>(null);
+  const audioPlayerContextRef = useRef<AudioContext | null>(null);
+  const audioRecorderNodeRef = useRef<AudioWorkletNode | null>(null);
+  const audioRecorderContextRef = useRef<AudioContext | null>(null);
+  const eventSourceRef = useRef<AbortController | null>(null);
+  const audioBufferRef = useRef<Uint8Array[]>([]);
+  const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    console.log('🔍 SessionId state changed to:', sessionId);
-  }, [sessionId]);
-  
-  useEffect(() => {
-    if (isSpeaking && volume > 0.1) {      
+    if (isSpeaking && volume > 0.1) {
       // 1. Send clear command to AudioWorklet to stop playback immediately
       if (audioPlayerNodeRef.current) {
         audioPlayerNodeRef.current.port.postMessage({ command: 'clear' });
@@ -65,15 +76,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       setIsSpeaking(false);
       console.log('🎤 User interrupted with voice - switching to listening');
     }
-  }, [volume, isSpeaking]);
-
-  const audioPlayerNodeRef = useRef<AudioWorkletNode | null>(null);
-  const audioPlayerContextRef = useRef<AudioContext | null>(null);
-  const audioRecorderNodeRef = useRef<AudioWorkletNode | null>(null);
-  const audioRecorderContextRef = useRef<AudioContext | null>(null);
-  const eventSourceRef = useRef<AbortController | null>(null);
-  const audioBufferRef = useRef<Uint8Array[]>([]);
-  const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  }, [volume]);
 
   // Connect to SSE for real-time communication
   const connectSSE = useCallback((audioMode: boolean = true) => {
@@ -84,14 +87,14 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
     const sseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/voice-redis/events/${userId}?is_audio=${audioMode}`;
     console.log(`🔗 Connecting Redis SSE with audio mode: ${audioMode}`);
-    
+
     const startConnection = async () => {
       try {
         const token = await getAccessToken();
-        
+
         const abortController = new AbortController();
         eventSourceRef.current = abortController; // Store abort controller for cleanup
-        
+
         await fetchEventSource(sseUrl, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -127,65 +130,219 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
         setIsConnected(false);
       }
     };
-    
+
     // Start connection but don't await it
     startConnection();
   }, [userId]);
 
-  // Handle messages from server
-  const handleServerMessage = (message: VoiceEvent) => {
-    console.log('📨 Received Redis server message:', message);
-    
-    // Handle session_created event
-    if (message.type === 'session_created' && message.session_id) {
-      console.log('🔍 Setting sessionId from:', message.session_id);
-      setSessionId(message.session_id);
-      sessionIdRef.current = message.session_id; // Also store in ref for immediate access
-      console.log('✅ Voice session created:', message.session_id);
+  const sendBufferedAudio = async () => {
+    if (paused || !isOpen || audioBufferRef.current.length === 0) {
+      isSendingRef.current = false;
       return;
     }
-    
-    // Handle heartbeat event
+
+    setLastResponse('');
+    isSendingRef.current = true;
+
+    const currentSessionId = sessionIdRef.current;
+    if (!currentSessionId) {
+      console.warn("Session ID not available, aborting send.");
+      isSendingRef.current = false;
+      return;
+    }
+
+    const audioBufferToSend = [...audioBufferRef.current];
+    audioBufferRef.current = [];
+    console.log(`🎤 Preparing to send ${audioBufferToSend.length} audio chunks to session: ${currentSessionId}`);
+
+    const totalLength = audioBufferToSend.reduce((acc, chunk) => acc + chunk.length, 0);
+    const combinedArray = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of audioBufferToSend) {
+      combinedArray.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    const base64Data = btoa(String.fromCharCode(...combinedArray));
+
+    console.log(`🎤 Sending audio data to session: ${currentSessionId}, size: ${base64Data.length} chars`);
+
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/voice-redis/send/${currentSessionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ mime_type: 'audio/pcm', data: base64Data }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (reader) {
+        const decoder = new TextDecoder();
+        let buffer = ''; // Buffer to hold incomplete message parts
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            // Append new data from the stream to our buffer
+            buffer += decoder.decode(value, { stream: true });
+
+            // Process all complete messages (ending in '\n\n') in the buffer
+            let boundaryIndex;
+            while ((boundaryIndex = buffer.indexOf('\n\n')) >= 0) {
+              // Extract a full message
+              const message = buffer.substring(0, boundaryIndex);
+              // Remove the processed message and its boundary from the buffer
+              buffer = buffer.substring(boundaryIndex + 2);
+
+              if (message.startsWith('data: ')) {
+                const eventData = message.substring(6);
+                if (eventData.trim()) {
+                  try {
+                    const data = JSON.parse(eventData);
+                    handleServerMessage(data);
+                  } catch (e) {
+                    console.error('Error parsing server event message:', eventData, e);
+                  }
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send audio data:', error);
+      audioBufferRef.current = [...audioBufferToSend, ...audioBufferRef.current];
+    } finally {
+      isSendingRef.current = false;
+
+      if (audioBufferRef.current.length > 0) {
+        setTimeout(() => {
+          if (!isSendingRef.current) {
+            sendBufferedAudio();
+          }
+        }, 0);
+      }
+    }
+  };
+
+  const isSpeakingRef = useRef(isSpeaking);
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+  }, [isSpeaking]);
+
+  // Audio recorder handler
+  // This function will be called by the AudioWorklet when new PCM data is available
+  const MAX_BUFFER_SIZE = 100;
+  const MIN_BUFFER_CHUNKS = 20;
+  const maxWaitRef = useRef<NodeJS.Timeout | null>(null);
+
+  const audioRecorderHandler = (pcmData: ArrayBuffer) => {
+    if (paused || !isOpen || isSpeakingRef.current) return;
+
+    audioBufferRef.current.push(new Uint8Array(pcmData));
+
+    if (audioBufferRef.current.length > MAX_BUFFER_SIZE) {
+      audioBufferRef.current.shift();
+      console.warn("⚠️ audioBufferRef exceeded MAX_BUFFER_SIZE, dropping old data.");
+    }
+
+    if (maxWaitRef.current) clearTimeout(maxWaitRef.current);
+    maxWaitRef.current = setTimeout(() => {
+      if (!isSendingRef.current && audioBufferRef.current.length > 0) {
+        sendBufferedAudio();
+      }
+    }, 3000);
+
+    if (!isSendingRef.current && audioBufferRef.current.length >= MIN_BUFFER_CHUNKS) {
+      sendBufferedAudio();
+    }
+  };
+
+  const startSpeaking = () => {
+    setIsSpeaking(true);
+    if (audioRecorderContextRef.current) {
+      audioRecorderContextRef.current.suspend();
+      console.log('🔇 Suspend recording');
+    }
+
+    audioBufferRef.current = [];
+    isSendingRef.current = false;
+  };
+
+  const stopSpeaking = () => {
+    setIsSpeaking(false);
+    setLastResponse('');
+
+    // 1. Reset the audio buffer to discard any stale data.
+    audioBufferRef.current = [];
+
+    // 2. Ensure the sending flag is reset.
+    isSendingRef.current = false;
+
+    if (audioRecorderContextRef.current?.state === 'suspended') {
+      audioRecorderContextRef.current.resume();
+      console.log('🎙️ Resume recording');
+    }
+  };
+
+  const handleServerMessage = (message: VoiceEvent) => {
+    console.log('📨 Received Redis server message:', message);
+
+    if (message.type === 'session_created' && message.session_id) {
+      sessionIdRef.current = message.session_id;
+      console.log('✅ Voice session created and ref updated:', message.session_id);
+      return;
+    }
+
+    if (message.type === 'transcript') {
+      if (typeof message.data === 'object' && message.data && 'text' in message.data) {
+        setTranscript((message.data as TranscriptData).text || '');
+      } else {
+        setTranscript('');
+      }
+      return;
+    }
+
+
     if (message.type === 'heartbeat') {
       console.log('💓 Heartbeat received');
       return;
     }
-    
-    // Handle error event
+
     if (message.type === 'error') {
       console.error('❌ Server error:', message.error || message.message);
       return;
     }
-    
-    if (message.type === 'text' && (message.data || message.text)) {
-      const textContent = message.data || message.text || '';
-      setLastResponse(textContent);
-      // When we receive text, system is about to speak
-      setIsSpeaking(true);
-      
-      // Set a timeout to reset speaking state (fallback)
-      if (speakingTimeoutRef.current) {
-        clearTimeout(speakingTimeoutRef.current);
-      }
-      speakingTimeoutRef.current = setTimeout(() => {
-        setIsSpeaking(false);
-        console.log('🔇 Speaking timeout - resetting to listening');
-      }, 10000); // 10 seconds timeout
-      
-    } else if (message.type === 'audio' && message.data && message.mime_type === "audio/pcm") {
-      // Play audio response
+
+    if (message.type === 'text') {
+      setTranscript('');
+      setLastResponse(typeof message.data === 'string' ? message.data : '');
+      startSpeaking();
+
+      if (speakingTimeoutRef.current) clearTimeout(speakingTimeoutRef.current);
+      speakingTimeoutRef.current = setTimeout(stopSpeaking, 20000);
+    } else if (message.type === 'audio' && message.data) {
+      setTranscript('');
       if (audioPlayerNodeRef.current) {
-        setIsSpeaking(true);
-        audioPlayerNodeRef.current.port.postMessage(base64ToArray(message.data));
-        
-        // Set a timeout to reset speaking state (fallback)
-        if (speakingTimeoutRef.current) {
-          clearTimeout(speakingTimeoutRef.current);
+        startSpeaking();
+        if (typeof message.data === 'string') {
+          audioPlayerNodeRef.current.port.postMessage(base64ToArray(message.data));
+        } else {
+          console.warn('Expected audio data as base64 string but got:', message.data);
         }
-        speakingTimeoutRef.current = setTimeout(() => {
-          setIsSpeaking(false);
-          console.log('🔇 Speaking timeout - resetting to listening');
-        }, 10000); // 10 seconds timeout
+
+        if (speakingTimeoutRef.current) clearTimeout(speakingTimeoutRef.current);
+        speakingTimeoutRef.current = setTimeout(stopSpeaking, 10000);
       }
     }
   };
@@ -198,22 +355,19 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       audioPlayerNodeRef.current = playerNode as AudioWorkletNode;
       audioPlayerContextRef.current = playerCtx as AudioContext;
 
-      // Listen for audio playback completion
       if (audioPlayerNodeRef.current) {
         audioPlayerNodeRef.current.port.onmessage = (event) => {
           if (event.data.type === 'playback_ended') {
-            setIsSpeaking(false);
-            // Clear the speaking timeout since playback ended naturally
+            stopSpeaking();
             if (speakingTimeoutRef.current) {
               clearTimeout(speakingTimeoutRef.current);
               speakingTimeoutRef.current = null;
             }
-            console.log('🔇 Audio playback ended');
           }
         };
+
       }
 
-      // Start audio input
       const [recorderNode, recorderCtx] = await startAudioRecorderWorklet(audioRecorderHandler);
       audioRecorderNodeRef.current = recorderNode as AudioWorkletNode;
       audioRecorderContextRef.current = recorderCtx as AudioContext;
@@ -225,107 +379,6 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       return false;
     }
   }, [paused, isOpen, setIsSpeaking]);
-
-  // Handle audio data from recorder
-  function audioRecorderHandler(pcmData: ArrayBuffer) {
-    if (paused || !isOpen) return;
-    
-    audioBufferRef.current.push(new Uint8Array(pcmData));
-    
-    // If the sending loop is not running, start it
-    if (!isSendingRef.current) {
-      sendBufferedAudio();
-    }
-  }
-
-  // Send buffered audio to server
-  const sendBufferedAudio = useCallback(async () => {
-    if (paused || !isOpen) {
-      isSendingRef.current = false;
-      return;
-    }
-    
-    const currentSessionId = sessionIdRef.current || sessionId;
-    if (!currentSessionId) {
-      console.warn('⚠️ No sessionId available, cannot send audio. State sessionId:', sessionId, 'Ref sessionId:', sessionIdRef.current);
-      isSendingRef.current = false;
-      return;
-    }
-    
-    if (audioBufferRef.current.length === 0) {
-      isSendingRef.current = false;
-      return;
-    }
-
-    isSendingRef.current = true;
-
-    // Combine all audio chunks into one
-    const audioBufferToSend = [...audioBufferRef.current];
-    audioBufferRef.current = []; // Clear the buffer immediately, ready to receive new audio
-
-    const totalLength = audioBufferToSend.reduce((acc, chunk) => acc + chunk.length, 0);
-    const combinedArray = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const chunk of audioBufferToSend) {
-      combinedArray.set(chunk, offset);
-      offset += chunk.length;
-    }
-
-    const base64Data = btoa(String.fromCharCode(...combinedArray));
-    
-    console.log(`🎤 Sending audio data to session: ${currentSessionId}, size: ${base64Data.length} chars`);
-    
-    try {
-      const token = await getAccessToken();
-      // Use new Redis API endpoint with session_id
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/voice-redis/send/${currentSessionId}`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ mime_type: 'audio/pcm', data: base64Data }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      if (reader) {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const chunk = new TextDecoder().decode(value);
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.substring(6));
-                  handleServerMessage(data);
-                } catch {
-                  console.warn('Failed to parse chunk:', line);
-                }
-              }
-            }
-          }
-        } finally {
-          reader.releaseLock();
-        }
-      }
-    } catch (error) {
-      console.error('Failed to send audio data:', error);
-      // If there's an error, put the unsent audio back at the beginning of the buffer
-      audioBufferRef.current = [...audioBufferToSend, ...audioBufferRef.current];
-    } finally {
-      // Whether successful or not, check and try to send again after 200ms
-      setTimeout(sendBufferedAudio, 200);
-    }
-  }, [isOpen, paused, sessionId]);
 
   // Start audio mode when overlay opens
   useEffect(() => {
@@ -340,7 +393,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
           // Connect SSE with audio mode
           connectSSE(true);
-          
+
           console.log('🎤 Redis voice mode starting...');
         } catch (error) {
           console.error('❌ Failed to start voice mode:', error);
@@ -350,6 +403,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       startAudioMode();
     }
   }, [isOpen, isAudioMode, connectSSE]);
+
 
   // Handle pause/play toggle
   const handlePauseToggle = () => {
@@ -371,19 +425,19 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   // Handle close
   const handleClose = useCallback(() => {
     console.log('🔚 handleClose called');
-    
+
     // Clear speaking timeout
     if (speakingTimeoutRef.current) {
       clearTimeout(speakingTimeoutRef.current);
       speakingTimeoutRef.current = null;
     }
-    
+
     // Abort SSE connection
     if (eventSourceRef.current) {
       eventSourceRef.current.abort();
       eventSourceRef.current = null;
     }
-    
+
     // Close audio contexts
     if (audioRecorderContextRef.current) {
       audioRecorderContextRef.current.close();
@@ -393,14 +447,14 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       audioPlayerContextRef.current.close();
       audioPlayerContextRef.current = null;
     }
-    
+
     // Reset states
     setIsConnected(false);
     setIsAudioMode(false);
     setPaused(false);
     setIsSpeaking(false);
     setLastResponse('');
-    setSessionId(null);
+    // setSessionId(null);
     sessionIdRef.current = null;
     audioBufferRef.current = [];
     isSendingRef.current = false;
@@ -433,12 +487,12 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
           {!isConnected && '🔄 Connecting...'}
           {isConnected && paused && '⏸️ Paused'}
           {isConnected && !paused && isSpeaking && '🔊 Speaking...'}
-          {isConnected && !paused && !isSpeaking && sessionId && '🎤 Listening...'}
-          {isConnected && !paused && !isSpeaking && !sessionId && '⏳ Waiting for session...'}
+          {isConnected && !paused && !isSpeaking && '🎤 Listening...'}
+          {/* {isConnected && !paused && !isSpeaking && '⏳ Waiting for session...'} */}
         </div>
         <button
           className="size-12 flex justify-center items-center rounded-full bg-black/20 hover:bg-black/40 text-white transition cursor-pointer relative z-10"
-          onClick={() => {handleClose();}}
+          onClick={() => { handleClose(); }}
           title="Close"
         >
           <FaTimes size={20} />
@@ -448,7 +502,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       <main className="flex-1 flex flex-col items-center justify-center -mt-10">
         <div className="h-24 text-center">
           <p className={`text-2xl font-semibold transition-opacity duration-300 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-            {lastResponse}
+            {transcript || lastResponse}
           </p>
         </div>
 
@@ -469,7 +523,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
               }}
             />
           ))}
-          
+
           <div
             className={`absolute text-4xl transition-transform duration-500 ease-out 
             ${isSpeaking ? 'scale-125' : 'scale-100'}`}
