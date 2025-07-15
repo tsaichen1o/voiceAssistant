@@ -1,6 +1,4 @@
 import requests
-# For web scraping
-import bs4
 # For randomly selecting programs
 import random
 import json
@@ -10,6 +8,7 @@ from app.tests.tum_data_retriever import WebScraper
 from google.adk.agents import Agent
 from app.config import settings
 from app.services.chat_service import stream_chat_response
+import asyncio
 
 # URL contains all TUM programs
 MAIN_URL = "https://www.tum.de/en/studies/degree-programs"
@@ -212,3 +211,11 @@ test_chatbot_agent = Agent(
     ),
     tools=[randomly_select_a_program, ask_llm_chatbot, save_test_report],
 )
+async def main():
+    prompt = input("User input: ")
+    result = await ask_llm_chatbot(prompt)
+    print(f"LLM response: {result}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
