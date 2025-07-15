@@ -27,6 +27,12 @@ A FastAPI-based backend service that provides AI chat functionality using Google
 
 ## Installation & Setup
 
+First, create a virtual environment by running the following command in the CLI:
+
+```bash
+python -m venv venv
+```
+
 ### 1. Install Dependencies
 
 ```bash
