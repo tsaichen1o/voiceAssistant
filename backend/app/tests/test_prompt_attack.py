@@ -137,10 +137,10 @@ if __name__ == "__main__":
     # asyncio.run(call_prompt_injection_agent())
     # print("Finished testing prompt injection attacks")
 
-    # print("Testing prompt leaking attacks")
-    # asyncio.run(call_prompt_leaking_agent())
-    # print("Finished testing prompt leaking attacks")
+    print("Testing prompt leaking attacks")
+    asyncio.run(call_prompt_leaking_agent())
+    print("Finished testing prompt leaking attacks")
 
-    print("Testing jailbreaking attacks")
-    asyncio.run(call_jailbreaking_agent())
-    print("Finished testing jailbreaking attacks")
+    # print("Testing jailbreaking attacks")
+    # asyncio.run(call_jailbreaking_agent())
+    # print("Finished testing jailbreaking attacks")

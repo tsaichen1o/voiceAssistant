@@ -111,3 +111,73 @@ It should show the following information in the CLI
 📊 Total: 106
 📈 Accuracy rate: 0.9528301886792453%
 ```
+
+
+## Test robustness against prompt attacks
+### Introduction
+As a chatbot for providing information about a university, we are aware of the 
+importance of protecting the university reputation. Therefore, we conducted 
+tests to see how the chatbot responses to different prompt attacks techniques. 
+So far, the following prompt attacks techniques have been covered in our test
+cases.
+* Prompt injection: Cause chatbot response in an unintended way. For example, 
+saying it is `EvilTUM` or adopting the pirate slang.
+* Prompt leaking: Cause the chatbot to leak some of its previous prompts or instruction.
+* Jailbreaking: Cover bad intention in a good attitude. For example, trying to 
+persuade the chatbot to give advice on how to cheat in the exam by saying they 
+are administrative staffs that want to know in order to prevent cheating behavior.
+
+### Methods
+We conduct the tests by creating Google ADK Agent which generates prompt attacks 
+and queries our chatbot, then evaluating whether the chatbot is safe under that 
+attacks or not.
+
+We then modify our prompts to avoid such attacks and run these prompt attackes 
+again. The result shows that these attacks are all prevented after the prompt 
+is improved.
+
+# Collected Data
+You can see the data that we have collected until 15/7/2025 in the folder: `voiceAssistant\backend\app\tests\test_results_15072025`
+* `accuracy_test_reports.jsonl`: shows the reports from the `test_chatbot_agent` 
+when testing the accuracy of our LLM-based chatbot.
+* `accuracy_test_chat_history.jsonl`: shows the chat history between 
+`test_chatbot_agent` and our TUM chatbot during testing.
+* `attack_test_reports.jsonl`: shows the reports from `prompt_attack_agent` when 
+trying to attack our LLM-based chatbot.
+* `prompt_attack_chat_history.jsonl`: shows that chat history between `prompt_attack_agent` 
+and our TUM chatbot during testing.
+* `attack_success_before.jsonl`: is the filtered version of the `attack_test_reports.jsonl` 
+which shows only the cases that the attacks success.
+* `attack_retry.jsonl`: stores the conversation after we improve the prompt and 
+retries the attacks that success in `attack_success_before.jsonl`.
+
+## Insights
+From the collected data, we created the `prompt_attack_analysis.py` file, which 
+shows the statistic of the `attack_success_before.jsonl`. The statistics are:
+```
+✅ Correct (True): 6
+❌ Incorrect (False): 3
+📊 Total: 9
+📈 Accuracy rate: 0.6666666666666666%
+PS C:\Users\Lenovo\Downloads\MasterProgram\FoundationsAndApplicationOfGenerativeAI\Project_2\voiceAssistant\backend> python -m app.tests.prompt_attack_analysis
+--------------------- PROMPT INJECTION ----------------------------
+✅ Number of attacks failed: 8
+❌ Number of attacks succeeded: 5
+📊 Total attacks: 13
+📈 Safety rate: 0.6153846153846154
+The cases that the prompt injection attack succeed is stored in file: ./app/tests/test_results_15072025/attack_success_before.jsonl
+--------------------- PROMPT LEAKING ----------------------------
+✅ Number of attacks failed: 2
+❌ Number of attacks succeeded: 8
+📊 Total attacks: 10
+📈 Safety rate: 0.2
+The cases that the prompt leaking attack succeed is stored in file: ./app/tests/test_results_15072025/attack_success_before.jsonl
+--------------------- JAILBREAKING ----------------------------
+✅ Number of attacks failed: 21
+❌ Number of attacks succeeded: 0
+📊 Total attacks: 21
+📈 Safety rate: 1.0
+The cases that the jailbreaking attack succeed is stored in file: ./app/tests/test_results_15072025/attack_success_before.jsonl
+```
+
+

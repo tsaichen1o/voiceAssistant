@@ -21,7 +21,7 @@ def analyze_each_line(file_path: str) -> None:
     jailbreaking_fail_count = 0
     jailbreaking_total_attack = 0
     # Path to the jsonl file that store the case that the chatbot was successfully attacked
-    success_report_path = r"./app/tests/test_results/attack_success_before.jsonl"
+    success_report_path = r"./app/tests/test_results/attack_retry.jsonl"
     try:
         with open(file_path, "r", encoding="utf-8") as file:
             for line in file:
@@ -73,29 +73,30 @@ def analyze_each_line(file_path: str) -> None:
     print(f"❌ Number of attacks succeeded: {injection_success_count}")
     print(f"📊 Total attacks: {injection_total_attack}")
 
-    injection_safe_rate = injection_fail_count / injection_total_attack
-    print(f"📈 Safety rate: {injection_safe_rate}")
-
-    print(f"The cases that the prompt injection attack succeed is stored in file: {success_report_path}")
+    if injection_total_attack != 0:
+        injection_safe_rate = injection_fail_count / injection_total_attack
+        print(f"📈 Safety rate: {injection_safe_rate}")
+        print(f"The cases that the prompt injection attack succeed is stored in file: {success_report_path}")
 
     print(f"--------------------- PROMPT LEAKING ----------------------------")
     print(f"✅ Number of attacks failed: {leaking_fail_count}")
     print(f"❌ Number of attacks succeeded: {leaking_success_count}")
     print(f"📊 Total attacks: {leaking_total_attack}")
-
-    leaking_safe_rate = leaking_fail_count / leaking_total_attack
-    print(f"📈 Safety rate: {leaking_safe_rate}")
-    print(f"The cases that the prompt leaking attack succeed is stored in file: {success_report_path}")
+    if leaking_total_attack != 0:
+        leaking_safe_rate = leaking_fail_count / leaking_total_attack
+        print(f"📈 Safety rate: {leaking_safe_rate}")
+        print(f"The cases that the prompt leaking attack succeed is stored in file: {success_report_path}")
 
     print(f"--------------------- JAILBREAKING ----------------------------")
     print(f"✅ Number of attacks failed: {jailbreaking_fail_count}")
     print(f"❌ Number of attacks succeeded: {jailbreaking_success_count}")
     print(f"📊 Total attacks: {jailbreaking_total_attack}")
 
-    jailbreaking_safe_rate = jailbreaking_fail_count / jailbreaking_total_attack
-    print(f"📈 Safety rate: {jailbreaking_safe_rate}")
-    print(f"The cases that the jailbreaking attack succeed is stored in file: {success_report_path}")
+    if jailbreaking_total_attack != 0:
+        jailbreaking_safe_rate = jailbreaking_fail_count / jailbreaking_total_attack
+        print(f"📈 Safety rate: {jailbreaking_safe_rate}")
+        print(f"The cases that the jailbreaking attack succeed is stored in file: {success_report_path}")
 
                 
 if __name__ == "__main__":
-    analyze_each_line(r"./app/tests/test_results/attack_test_reports_before.jsonl")
+    analyze_each_line(r"./app/tests/test_results/attack_test_reports.jsonl")

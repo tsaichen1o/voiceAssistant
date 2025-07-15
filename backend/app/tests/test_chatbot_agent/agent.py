@@ -89,6 +89,8 @@ async def ask_llm_chatbot(prompt: str) -> dict:
     # Store the chat history in a .jsonl file
     # Path to the file that stores the chat history
     chat_history_path = r"./app/tests/test_results/chat_history.jsonl"
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(chat_history_path), exist_ok=True)
     try:
         with open(chat_history_path, "a", encoding="utf-8") as file:
             json.dump({
