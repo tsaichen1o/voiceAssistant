@@ -13,8 +13,6 @@ from dotenv import load_dotenv
 from google.generativeai.client import configure
 from google.generativeai.generative_models import GenerativeModel
 from app.config import settings
-from typing import Optional
-from pathlib import Path
 
 # Rmemainder: comment the VOICE_MODEL line in .env file
 
