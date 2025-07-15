@@ -12,7 +12,6 @@ from datetime import datetime
 from dotenv import load_dotenv
 from google.generativeai.client import configure
 from google.generativeai.generative_models import GenerativeModel
-from faster_whisper import WhisperModel
 from app.config import settings
 
 # Rmemainder: comment the VOICE_MODEL line in .env file
