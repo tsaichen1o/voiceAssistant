@@ -48,3 +48,9 @@ requests>=2.31.0
 # NOTE: protobuf has been removed from this file.
 # It is a sub-dependency of 'google-generativeai' and will be
 # installed automatically by pip with a compatible version.
+
+# For tests
+beautifulsoup4>=4.13.4
+langchain
+langchain-community
+langchain-core
