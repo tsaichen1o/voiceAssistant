@@ -1,12 +1,10 @@
 import logging
-import io
+import numpy as np
 import re
 import warnings
 from pathlib import Path
 from typing import Optional
-
 import torch
-import torchaudio
 from huggingface_hub import snapshot_download
 from speechbrain.inference.TTS import FastSpeech2
 from speechbrain.inference.vocoders import HIFIGAN
@@ -23,11 +21,13 @@ warnings.filterwarnings(
 
 FASTSPEECH2_REPO = "speechbrain/tts-fastspeech2-ljspeech"
 FASTSPEECH2_DIR  = "pretrained_models/tts-fastspeech2-ljspeech"
-HIFIGAN_REPO     = "speechbrain/tts-hifigan-libritts-16kHz"
-HIFIGAN_DIR      = "pretrained_models/tts-hifigan-libritts-16kHz"
+HIFIGAN_REPO     = "speechbrain/tts-hifigan-ljspeech"
+HIFIGAN_DIR      = "pretrained_models/tts-hifigan-ljspeech"
+
 
 def is_model_cached(model_dir: str, files: list[str]) -> bool:
     return all(Path(model_dir, f).exists() for f in files)
+
 
 try:
     if not is_model_cached(FASTSPEECH2_DIR, ["hyperparams.yaml","model.ckpt"]):
@@ -47,6 +47,7 @@ except Exception as e:
     tts_model = vocoder_model = None
 
 
+# From tensor to PCM bytes
 def synthesize_speech(text: str) -> bytes:
     if not tts_model or not vocoder_model:
         raise RuntimeError("Models not loaded.")
@@ -56,12 +57,18 @@ def synthesize_speech(text: str) -> bytes:
     # squeeze batch dimension → [n_mels, time]
     mel_spec = mel_output.squeeze(0).to(device)
 
-    wav = vocoder_model.decode_batch(mel_spec).squeeze(0).cpu()
+    # generate float tensor
+    wav_float = vocoder_model.decode_batch(mel_spec).squeeze(0).cpu()
 
-    buf = io.BytesIO()
-    torchaudio.save(buf, wav.unsqueeze(0), sample_rate=16000, format="wav") # maybe you can change the sample rate on your computer, i tried 16000 and 22050, both do not work
-    buf.seek(0)
-    return buf.read()
+    # convert to 16-bit signed integer
+    # multiply by the max value for 16-bit signed integer
+    wav_int16 = (wav_float * 32767).to(torch.int16)
+
+    wav_np = wav_int16.numpy()
+    pcm_bytes = wav_np.tobytes()
+
+    return pcm_bytes
+
 
 def safe_synthesize_speech(text: str) -> Optional[bytes]:
     cleaned = text.strip()
