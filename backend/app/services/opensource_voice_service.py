@@ -42,7 +42,7 @@ class OpenSourceVoiceService:
     
     def __init__(self):
         """Initialize the open source voice service."""
-        logger.info("🚀 Initializing OpenSource Voice Service...")
+        logger.info("🚀Initializing OpenSource Voice Service...")
         
         # Initialize Redis connection for session management (compatible with existing system)
         if hasattr(settings, 'REDIS_URL') and settings.REDIS_URL:
