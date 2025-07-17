@@ -30,7 +30,7 @@ load_dotenv()
 APP_NAME = "Voice Assistant"
 SESSION_EXPIRY = 3600  # 1 hour 
 SAMPLE_RATE = 16000
-BUFFER_SECONDS = 5
+BUFFER_SECONDS = 4
 
 class RedisVoiceService:
     def __init__(self):
@@ -100,9 +100,9 @@ class RedisVoiceService:
                     yield {"type": "error", "message": "Failed to decode base64 audio."}
                     return
 
-                if len(audio_bytes) < 512:  # ✅ Minimum length check
-                    yield {"type": "error", "message": "Audio data too short."}
-                    return
+                # if len(audio_bytes) < 512:  # ✅ Minimum length check
+                #     yield {"type": "error", "message": "Audio data too short."}
+                #     return
 
                 audio_np_array = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
                 self.audio_buffer.setdefault(session_id, []).extend(audio_np_array.tolist())
@@ -126,9 +126,9 @@ class RedisVoiceService:
                         yield {"type": "error", "message": f"Whisper error: {str(e)}"}
                         return
 
-                    if not transcript_text.strip():
-                        yield {"type": "error", "message": "No speech detected."}
-                        return
+                    # if not transcript_text.strip():
+                    #     yield {"type": "error", "message": "No speech detected."}
+                    #     return
 
                     yield {
                         "type": "transcript",
@@ -224,7 +224,8 @@ class RedisVoiceService:
             # ========== 4. Audio streaming synthesis + output ==========
             sentence_buffer = ""
             full_response_text = ""
-            sentence_delimiters = re.compile(r'(?<=[.!?])\s*')
+            sentence_delimiters = re.compile(r'(?<=[.!])\s*')
+
 
             for chunk in response:
                 if not chunk.text:
