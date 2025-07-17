@@ -16,12 +16,15 @@ interface VoiceEvent {
   type: 'text' | 'audio' | 'session_created' | 'heartbeat' | 'error';
   data?: string;
   mime_type?: string;
+  format?: string;  // Audio format (mp3, pcm, etc.)
   text?: string;
   session_id?: string;
   timestamp?: string;
   error?: string;
   message?: string;
   partial?: boolean;
+  sample_rate?: number;  // Audio sample rate
+  text_source?: string;  // Source text for TTS audio
 }
 
 interface VoiceAssistantOverlayProps {
@@ -36,10 +39,43 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   const [isConnected, setIsConnected] = useState(false);
   const [isAudioMode, setIsAudioMode] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [lastResponse, setLastResponse] = useState<string>('');
+  const [transcript, setTranscript] = useState<string>('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const isSendingRef = useRef(false);
+  const isOpenRef = useRef(isOpen);
+  const pausedRef = useRef(paused);
+  const lastSendTimeRef = useRef(0);
+  const sendTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Keep refs in sync with current state
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+  
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+  
+  // Debug isOpen prop changes specifically
+  const prevIsOpenRef = useRef(isOpen);
+  useEffect(() => {
+    if (prevIsOpenRef.current !== isOpen) {
+      console.log('🚨 CRITICAL: isOpen prop changed from', prevIsOpenRef.current, 'to', isOpen);
+      console.log('🔄 Updating isOpenRef to:', isOpen);
+      prevIsOpenRef.current = isOpen;
+    }
+  }, [isOpen]);
+  
+  // Debug component render and state changes
+  useEffect(() => {
+    console.log('🔍 VoiceAssistantOverlay rendered - isOpen:', isOpen, 'paused:', paused, 'isAudioMode:', isAudioMode, 'isConnected:', isConnected);
+  });
+  
+  // Debug state changes
+  useEffect(() => {
+    console.log('🔍 State changed - paused:', paused, 'isOpen:', isOpen, 'isAudioMode:', isAudioMode, 'isConnected:', isConnected);
+  }, [paused, isOpen, isAudioMode, isConnected]);
   
   const volume = useMicrophoneVolume(isOpen && !paused && isAudioMode);
   const userId = user?.id;
@@ -67,6 +103,109 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     }
   }, [volume, isSpeaking]);
 
+  // 音量检测逻辑：决定何时开始/停止录制
+  useEffect(() => {
+    const VOLUME_THRESHOLD = 0.05;  // 音量阈值
+    const SILENCE_TIMEOUT = 1500;   // 静音1.5秒后发送
+    
+    // 如果组件未打开或正在暂停，不处理
+    if (!isOpen || paused || isSpeaking) {
+      return;
+    }
+    
+    if (volume > VOLUME_THRESHOLD) {
+      // 检测到说话
+      if (!isRecordingRef.current) {
+        console.log('🎤 开始录制语音 - 音量:', volume.toFixed(3));
+        isRecordingRef.current = true;
+        // Clear transcript when user starts speaking
+        setTranscript('');
+      }
+      
+      // 清除静音超时
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+        silenceTimeoutRef.current = null;
+      }
+    } else {
+      // 检测到静音
+      if (isRecordingRef.current && !silenceTimeoutRef.current) {
+        console.log('🔇 检测到静音，启动超时计时器 - 音量:', volume.toFixed(3));
+        
+        // 设置静音超时
+        silenceTimeoutRef.current = setTimeout(async () => {
+          if (isRecordingRef.current && audioBufferRef.current.length > 0) {
+            console.log('📤 静音超时，发送音频数据');
+            isRecordingRef.current = false;
+            
+            // 直接在这里发送音频数据，避免useCallback依赖问题
+            const currentSessionId = sessionIdRef.current;
+            if (currentSessionId && audioBufferRef.current.length > 0) {
+              try {
+                // 获取缓冲的音频数据
+                const audioBufferToSend = [...audioBufferRef.current];
+                audioBufferRef.current = []; // 清空缓冲区
+                
+                const totalLength = audioBufferToSend.reduce((acc, chunk) => acc + chunk.length, 0);
+                const combinedArray = new Uint8Array(totalLength);
+                let offset = 0;
+                for (const chunk of audioBufferToSend) {
+                  combinedArray.set(chunk, offset);
+                  offset += chunk.length;
+                }
+                
+                const base64Data = btoa(String.fromCharCode(...combinedArray));
+                console.log(`🎤 Sending voice activity audio: ${base64Data.length} chars`);
+                
+                const token = await getAccessToken();
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/opensource-voice/send/${currentSessionId}`, {
+                  method: 'POST',
+                  headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ mime_type: 'audio/pcm', data: base64Data }),
+                });
+                
+                if (response.ok) {
+                  // 处理流式响应
+                  const reader = response.body?.getReader();
+                  if (reader) {
+                    while (true) {
+                      const { done, value } = await reader.read();
+                      if (done) break;
+                      
+                      const chunk = new TextDecoder().decode(value);
+                      const lines = chunk.split('\n');
+                      
+                      for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                          try {
+                            const data = JSON.parse(line.substring(6));
+                            console.log('🔍 Parsed SSE data in timeout:', data);
+                            handleServerMessage(data);
+                          } catch (e) {
+                            console.warn('Failed to parse chunk:', line, 'Error:', e);
+                          }
+                        } else if (line.trim() && !line.startsWith(':')) {
+                          console.log('🔍 Non-data SSE line in timeout:', line);
+                        }
+                      }
+                    }
+                    reader.releaseLock();
+                  }
+                }
+              } catch (error) {
+                console.error('Voice activity send failed:', error);
+              }
+            }
+          }
+          silenceTimeoutRef.current = null;
+        }, SILENCE_TIMEOUT);
+      }
+    }
+     }, [volume, isOpen, paused, isSpeaking]);
+
   const audioPlayerNodeRef = useRef<AudioWorkletNode | null>(null);
   const audioPlayerContextRef = useRef<AudioContext | null>(null);
   const audioRecorderNodeRef = useRef<AudioWorkletNode | null>(null);
@@ -74,6 +213,8 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   const eventSourceRef = useRef<AbortController | null>(null);
   const audioBufferRef = useRef<Uint8Array[]>([]);
   const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isRecordingRef = useRef(false);  // 是否正在录制语音
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);  // 静音超时
 
   // Connect to SSE for real-time communication
   const connectSSE = useCallback((audioMode: boolean = true) => {
@@ -82,8 +223,8 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       eventSourceRef.current.abort();
     }
 
-    const sseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/voice-redis/events/${userId}?is_audio=${audioMode}`;
-    console.log(`🔗 Connecting Redis SSE with audio mode: ${audioMode}`);
+    const sseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/opensource-voice/events/${userId}?is_audio=${audioMode}`;
+    console.log(`🔗 Connecting OpenSource Voice SSE with audio mode: ${audioMode}`);
     
     const startConnection = async () => {
       try {
@@ -99,7 +240,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
           signal: abortController.signal,
           async onopen(response) {
             if (response.ok) {
-              console.log('🔗 Redis SSE connection established');
+              console.log('🔗 OpenSource Voice SSE connection established');
               setIsConnected(true);
               // Set audio mode when connection is established
               setIsAudioMode(true);
@@ -133,8 +274,10 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   }, [userId]);
 
   // Handle messages from server
-  const handleServerMessage = (message: VoiceEvent) => {
-    console.log('📨 Received Redis server message:', message);
+  const handleServerMessage = useCallback((message: VoiceEvent) => {
+    console.log('📨 Received OpenSource Voice server message:', message);
+    console.log('🔍 Message type:', message.type);
+    console.log('🔍 Message keys:', Object.keys(message));
     
     // Handle session_created event
     if (message.type === 'session_created' && message.session_id) {
@@ -159,44 +302,168 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     
     if (message.type === 'text' && (message.data || message.text)) {
       const textContent = message.data || message.text || '';
-      setLastResponse(textContent);
-      // When we receive text, system is about to speak
-      setIsSpeaking(true);
       
-      // Set a timeout to reset speaking state (fallback)
-      if (speakingTimeoutRef.current) {
-        clearTimeout(speakingTimeoutRef.current);
+      // Check if this is a transcript message (from Whisper)
+      const transcriptMatch = textContent.match(/^👤 You said: "(.+)"$/);
+      if (transcriptMatch) {
+        const transcriptText = transcriptMatch[1];
+        setTranscript(transcriptText);
+        console.log('🎤 Transcript received:', transcriptText);
+        return;
       }
-      speakingTimeoutRef.current = setTimeout(() => {
-        setIsSpeaking(false);
-        console.log('🔇 Speaking timeout - resetting to listening');
-      }, 10000); // 10 seconds timeout
       
-    } else if (message.type === 'audio' && message.data && message.mime_type === "audio/pcm") {
-      // Play audio response
-      if (audioPlayerNodeRef.current) {
-        setIsSpeaking(true);
-        audioPlayerNodeRef.current.port.postMessage(base64ToArray(message.data));
-        
-        // Set a timeout to reset speaking state (fallback)
-        if (speakingTimeoutRef.current) {
-          clearTimeout(speakingTimeoutRef.current);
+      // Skip all other text messages - we only want to show transcript
+      console.log('🔄 Text message ignored (not transcript):', textContent);
+      return;
+      
+    } else if (message.type === 'audio' && message.data) {
+      // Handle both PCM and MP3 audio formats
+      const audioFormat = message.format || message.mime_type;
+      console.log('🎵 Received audio message!');
+      console.log('🔍 Audio format detected:', audioFormat);
+      console.log('🔍 Audio data exists:', !!message.data);
+      console.log('🔍 Audio data length:', message.data?.length || 0);
+      
+      if (audioFormat === "audio/pcm" || audioFormat === "pcm") {
+        // Handle PCM audio (legacy Redis voice service)
+        if (audioPlayerNodeRef.current) {
+          setIsSpeaking(true);
+          audioPlayerNodeRef.current.port.postMessage(base64ToArray(message.data));
+          
+          // Set a timeout to reset speaking state (fallback)
+          if (speakingTimeoutRef.current) {
+            clearTimeout(speakingTimeoutRef.current);
+          }
+          speakingTimeoutRef.current = setTimeout(() => {
+            setIsSpeaking(false);
+            console.log('🔇 Speaking timeout - resetting to listening');
+          }, 10000); // 10 seconds timeout
         }
-        speakingTimeoutRef.current = setTimeout(() => {
+      } else if (audioFormat === "mp3" || audioFormat === "audio/mp3") {
+        // Handle MP3 audio (OpenSource voice service)
+        try {
+          setIsSpeaking(true);
+          console.log('🎵 Attempting to play MP3 audio from OpenSource service');
+          console.log('🔍 Audio data length:', message.data.length, 'characters');
+          
+          // Convert base64 to blob and play with HTML5 audio
+          const audioData = base64ToArray(message.data);
+          console.log('🔍 Converted audio data size:', audioData.byteLength, 'bytes');
+          
+          const audioBlob = new Blob([audioData], { type: 'audio/mpeg' });
+          console.log('🔍 Audio blob size:', audioBlob.size, 'bytes');
+          
+          const audioUrl = URL.createObjectURL(audioBlob);
+          console.log('🔍 Audio URL created:', audioUrl);
+          
+          const audio = new Audio(audioUrl);
+          
+          // More detailed event handlers
+          audio.onloadstart = () => console.log('🔄 Audio loading started');
+          audio.oncanplaythrough = () => console.log('✅ Audio can play through');
+          audio.onplay = () => console.log('▶️ Audio playback started');
+          audio.onpause = () => console.log('⏸️ Audio playback paused');
+          audio.onended = () => {
+            setIsSpeaking(false);
+            URL.revokeObjectURL(audioUrl);
+            if (speakingTimeoutRef.current) {
+              clearTimeout(speakingTimeoutRef.current);
+              speakingTimeoutRef.current = null;
+            }
+            console.log('🔇 MP3 audio playback ended naturally');
+          };
+          audio.onerror = (e) => {
+            setIsSpeaking(false);
+            URL.revokeObjectURL(audioUrl);
+            console.error('❌ MP3 audio playback error:', e);
+            console.error('❌ Audio error details:', audio.error);
+          };
+          
+          // Try to play with proper error handling
+          console.log('🎯 Attempting to play audio...');
+          audio.play()
+            .then(() => {
+              console.log('✅ Audio playback started successfully');
+            })
+            .catch(error => {
+              console.error('❌ Failed to play MP3 audio:', error);
+              console.error('❌ Error type:', error.name);
+              console.error('❌ Error message:', error.message);
+              
+              // Check if it's an autoplay policy issue
+              if (error.name === 'NotAllowedError') {
+                console.warn('⚠️ Audio blocked by autoplay policy - user interaction required');
+                // Create a user-interaction-triggered play mechanism
+                const playButton = document.createElement('button');
+                playButton.textContent = '🔊 Click to hear audio response';
+                playButton.style.cssText = `
+                  position: fixed;
+                  top: 50%;
+                  left: 50%;
+                  transform: translate(-50%, -50%);
+                  z-index: 10000;
+                  background: blue;
+                  color: white;
+                  border: none;
+                  padding: 15px 30px;
+                  border-radius: 10px;
+                  font-size: 16px;
+                  cursor: pointer;
+                `;
+                playButton.onclick = () => {
+                  audio.play();
+                  document.body.removeChild(playButton);
+                };
+                document.body.appendChild(playButton);
+                
+                // Auto-remove after 10 seconds
+                setTimeout(() => {
+                  if (document.body.contains(playButton)) {
+                    document.body.removeChild(playButton);
+                  }
+                }, 10000);
+              }
+              
+              setIsSpeaking(false);
+              URL.revokeObjectURL(audioUrl);
+            });
+          
+          // Set a timeout to reset speaking state (fallback)
+          if (speakingTimeoutRef.current) {
+            clearTimeout(speakingTimeoutRef.current);
+          }
+          speakingTimeoutRef.current = setTimeout(() => {
+            setIsSpeaking(false);
+            console.log('🔇 MP3 Speaking timeout - resetting to listening');
+          }, 15000); // 15 seconds timeout for MP3 (may be longer)
+          
+        } catch (error) {
+          console.error('❌ Error handling MP3 audio:', error);
           setIsSpeaking(false);
-          console.log('🔇 Speaking timeout - resetting to listening');
-        }, 10000); // 10 seconds timeout
+        }
+      } else {
+        console.warn('⚠️ Unsupported audio format:', audioFormat);
+      }
+    } else {
+      // Debug what we actually received
+      console.log('🔍 Message not processed - type:', message.type, 'has data:', !!message.data);
+      if (message.type === 'audio') {
+        console.log('❌ Audio message rejected - no data field');
       }
     }
-  };
+  }, []);
 
   // Initialize audio system
   const initializeAudio = useCallback(async () => {
     try {
+      console.log('🔧 Initializing audio system...');
+      
       // Start audio output
+      console.log('🔊 Starting audio player worklet...');
       const [playerNode, playerCtx] = await startAudioPlayerWorklet();
       audioPlayerNodeRef.current = playerNode as AudioWorkletNode;
       audioPlayerContextRef.current = playerCtx as AudioContext;
+      console.log('✅ Audio player worklet started');
 
       // Listen for audio playback completion
       if (audioPlayerNodeRef.current) {
@@ -214,38 +481,50 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       }
 
       // Start audio input
+      console.log('🎤 Starting audio recorder worklet...');
       const [recorderNode, recorderCtx] = await startAudioRecorderWorklet(audioRecorderHandler);
       audioRecorderNodeRef.current = recorderNode as AudioWorkletNode;
       audioRecorderContextRef.current = recorderCtx as AudioContext;
+      console.log('✅ Audio recorder worklet started');
 
       console.log('🎵 Audio system initialized successfully');
       return true;
     } catch (error) {
       console.error('❌ Failed to initialize audio system:', error);
+      console.error('Error details:', error);
       return false;
     }
-  }, [paused, isOpen, setIsSpeaking]);
-
-  // Handle audio data from recorder
-  function audioRecorderHandler(pcmData: ArrayBuffer) {
-    if (paused || !isOpen) return;
-    
-    audioBufferRef.current.push(new Uint8Array(pcmData));
-    
-    // If the sending loop is not running, start it
-    if (!isSendingRef.current) {
-      sendBufferedAudio();
-    }
-  }
+  }, []);
 
   // Send buffered audio to server
   const sendBufferedAudio = useCallback(async () => {
-    if (paused || !isOpen) {
+    const now = Date.now();
+    const MIN_SEND_INTERVAL = 300; // Minimum 300ms between sends
+    
+    // Check if we're sending too frequently
+    if (now - lastSendTimeRef.current < MIN_SEND_INTERVAL) {
+      console.log('🚫 Sending too frequently, skipping this cycle');
+      return;
+    }
+    
+    console.log('🔍 sendBufferedAudio called - paused:', paused, 'isOpen:', isOpen, 'bufferLength:', audioBufferRef.current.length);
+    
+    // Use ref values to get current state (avoid closure issues)
+    const currentPaused = pausedRef.current;
+    const currentIsOpen = isOpenRef.current;
+    
+    console.log('🔍 sendBufferedAudio - ref values:', { currentPaused, currentIsOpen });
+    console.log('🔍 sendBufferedAudio - closure values:', { paused, isOpen });
+    
+    if (currentPaused || !currentIsOpen) {
+      console.log('🚫 Stopping send: paused or not open');
       isSendingRef.current = false;
       return;
     }
     
     const currentSessionId = sessionIdRef.current || sessionId;
+    console.log('🔍 Current sessionId:', currentSessionId, 'State sessionId:', sessionId, 'Ref sessionId:', sessionIdRef.current);
+    
     if (!currentSessionId) {
       console.warn('⚠️ No sessionId available, cannot send audio. State sessionId:', sessionId, 'Ref sessionId:', sessionIdRef.current);
       isSendingRef.current = false;
@@ -253,11 +532,15 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     }
     
     if (audioBufferRef.current.length === 0) {
+      console.log('🔍 No audio data in buffer, stopping send');
       isSendingRef.current = false;
       return;
     }
+    
+    console.log('✅ All conditions passed, proceeding to send audio data');
 
     isSendingRef.current = true;
+    lastSendTimeRef.current = now;
 
     // Combine all audio chunks into one
     const audioBufferToSend = [...audioBufferRef.current];
@@ -277,8 +560,8 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     
     try {
       const token = await getAccessToken();
-      // Use new Redis API endpoint with session_id
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/voice-redis/send/${currentSessionId}`, {
+      // Use OpenSource Voice API endpoint with session_id
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/opensource-voice/send/${currentSessionId}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -322,10 +605,39 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       // If there's an error, put the unsent audio back at the beginning of the buffer
       audioBufferRef.current = [...audioBufferToSend, ...audioBufferRef.current];
     } finally {
-      // Whether successful or not, check and try to send again after 200ms
-      setTimeout(sendBufferedAudio, 200);
+      // Reset sending flag
+      isSendingRef.current = false;
     }
-  }, [isOpen, paused, sessionId]);
+  }, [sessionId, handleServerMessage]);
+
+  // Handle audio data from recorder
+  const audioRecorderHandler = useCallback((pcmData: ArrayBuffer) => {
+    // Use ref values to get current state (avoid closure issues)
+    const currentPaused = pausedRef.current;
+    const currentIsOpen = isOpenRef.current;
+    const currentlyRecording = isRecordingRef.current;
+    
+    console.log(`🎤 Audio data received: ${pcmData.byteLength} bytes - Recording: ${currentlyRecording}`);
+    
+    if (currentPaused || !currentIsOpen) {
+      console.log('🚫 Audio data received but ignored (paused or closed)');
+      return;
+    }
+    
+    // 只有在检测到语音活动时才收集音频数据
+    if (currentlyRecording) {
+      console.log(`📊 Adding to buffer. Current buffer size: ${audioBufferRef.current.length}`);
+      audioBufferRef.current.push(new Uint8Array(pcmData));
+      console.log(`📊 Buffer size after adding: ${audioBufferRef.current.length}`);
+    } else {
+      console.log('🔇 Audio data ignored - not currently recording (no voice detected)');
+    }
+  }, []);
+  
+  // Debug when audioRecorderHandler is recreated
+  useEffect(() => {
+    console.log('🔄 audioRecorderHandler recreated');
+  }, [audioRecorderHandler]);
 
   // Start audio mode when overlay opens
   useEffect(() => {
@@ -341,7 +653,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
           // Connect SSE with audio mode
           connectSSE(true);
           
-          console.log('🎤 Redis voice mode starting...');
+          console.log('🎤 OpenSource voice mode starting with voice activity detection...');
         } catch (error) {
           console.error('❌ Failed to start voice mode:', error);
         }
@@ -349,7 +661,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
       startAudioMode();
     }
-  }, [isOpen, isAudioMode, connectSSE]);
+  }, [isOpen]);
 
   // Handle pause/play toggle
   const handlePauseToggle = () => {
@@ -357,12 +669,22 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       const newPaused = !prev;
       if (newPaused) {
         console.log('⏸️ Voice paused');
-      } else {
-        // When resuming, check and try to send again
-        console.log('▶️ Voice resumed');
-        if (!isSendingRef.current) {
-          sendBufferedAudio();
+        // Clear any pending send timeout when pausing
+        if (sendTimeoutRef.current) {
+          clearTimeout(sendTimeoutRef.current);
+          sendTimeoutRef.current = null;
         }
+        // Clear silence timeout when pausing
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+          silenceTimeoutRef.current = null;
+        }
+        // Reset recording state
+        isRecordingRef.current = false;
+      } else {
+        // When resuming
+        console.log('▶️ Voice resumed');
+        // Recording will restart automatically when voice is detected
       }
       return newPaused;
     });
@@ -370,12 +692,24 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
   // Handle close
   const handleClose = useCallback(() => {
-    console.log('🔚 handleClose called');
+    console.log('🔚 handleClose called - Current isOpen prop:', isOpen);
     
     // Clear speaking timeout
     if (speakingTimeoutRef.current) {
       clearTimeout(speakingTimeoutRef.current);
       speakingTimeoutRef.current = null;
+    }
+    
+    // Clear send timeout
+    if (sendTimeoutRef.current) {
+      clearTimeout(sendTimeoutRef.current);
+      sendTimeoutRef.current = null;
+    }
+    
+    // Clear silence timeout
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
     }
     
     // Abort SSE connection
@@ -399,19 +733,22 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     setIsAudioMode(false);
     setPaused(false);
     setIsSpeaking(false);
-    setLastResponse('');
+    setTranscript('');
     setSessionId(null);
     sessionIdRef.current = null;
     audioBufferRef.current = [];
     isSendingRef.current = false;
+    isRecordingRef.current = false;
 
-    console.log('🔚 Redis voice assistant closed');
+    console.log('🔚 Voice assistant cleaned up, calling parent onClose()');
     onClose();
-  }, [onClose]);
+  }, [onClose, isOpen]);
 
   // Cleanup on unmount
   useEffect(() => {
+    console.log('🏗️ VoiceAssistantOverlay component mounted');
     return () => {
+      console.log('🗑️ VoiceAssistantOverlay component unmounting, calling handleClose');
       handleClose();
     };
   }, []);
@@ -438,7 +775,10 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
         </div>
         <button
           className="size-12 flex justify-center items-center rounded-full bg-black/20 hover:bg-black/40 text-white transition cursor-pointer relative z-10"
-          onClick={() => {handleClose();}}
+          onClick={() => {
+            console.log('🔍 X button clicked, calling handleClose');
+            handleClose();
+          }}
           title="Close"
         >
           <FaTimes size={20} />
@@ -447,9 +787,20 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
       <main className="flex-1 flex flex-col items-center justify-center -mt-10">
         <div className="h-24 text-center">
-          <p className={`text-2xl font-semibold transition-opacity duration-300 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-            {lastResponse}
-          </p>
+          {/* Display transcript from Whisper */}
+          {transcript && (
+            <p
+              className={`
+                rounded-sm bg-black/50 px-2 py-2
+                text-l font-medium text-white shadow-lg
+                transition-opacity duration-300
+                whitespace-pre-wrap
+              `}
+            >
+              <span className="mr-2">🗣️</span>
+              {transcript}
+            </p>
+          )}
         </div>
 
         <div className="relative w-64 h-64 flex items-center justify-center z-0">

@@ -23,6 +23,15 @@ export default function ChatInput({ onSend, isDarkMode, placeholder }: ChatInput
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
+  // Debug voiceOpen state changes
+  useEffect(() => {
+    console.log('🔍 ChatInput voiceOpen state changed to:', voiceOpen);
+    console.trace('🔍 Stack trace for voiceOpen change:');
+  }, [voiceOpen]);
+  
+  // Debug every render to track voiceOpen value
+  console.log('🔍 ChatInput rendering with voiceOpen:', voiceOpen);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasText = input.trim().length > 0;
 
@@ -83,7 +92,10 @@ export default function ChatInput({ onSend, isDarkMode, placeholder }: ChatInput
     <>
       <VoiceAssistantOverlay 
         isOpen={voiceOpen} 
-        onClose={() => {setVoiceOpen(false);}} 
+        onClose={() => {
+          console.log('🔍 ChatInput: VoiceAssistantOverlay onClose called');
+          setVoiceOpen(false);
+        }} 
         isDarkMode={isDarkMode}
       />
       <div className={`fixed bottom-0 left-0 w-full z-10 px-4 pb-4 ${isDarkMode ? 'bg-gradient-to-t from-gray-900 via-gray-900/90 to-transparent' : 'bg-gradient-to-t from-white via-white/90 to-transparent'} md:ml-56`}>
@@ -168,7 +180,10 @@ export default function ChatInput({ onSend, isDarkMode, placeholder }: ChatInput
                   } ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`}
                 type="button"
                 title="Voice"
-                onClick={() => setVoiceOpen(true)}
+                onClick={() => {
+                  console.log('🔍 ChatInput: Voice button clicked, setting voiceOpen to true');
+                  setVoiceOpen(true);
+                }}
                 disabled={isSending}
               >
                 <RiChatVoiceAiFill className="size-5" />
