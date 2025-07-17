@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Microphone Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        button { padding: 10px 20px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🎤 Microphone Debug Test</h1>
+    
+    <div id="status"></div>
+    
+    <button onclick="testMicrophonePermission()">测试麦克风权限</button>
+    <button onclick="testAudioRecording()">测试音频录制</button>
+    <button onclick="stopRecording()">停止录制</button>
+    
+    <div id="results"></div>
+    
+    <script>
+        let audioContext = null;
+        let mediaStream = null;
+        let isRecording = false;
+        let audioDataCount = 0;
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            document.getElementById('results').appendChild(div);
+            console.log(message);
+        }
+        
+        async function testMicrophonePermission() {
+            log('🔍 检查麦克风权限...', 'warning');
+            
+            try {
+                // 检查浏览器权限API
+                if ('permissions' in navigator) {
+                    const permission = await navigator.permissions.query({ name: 'microphone' });
+                    log(`📋 权限状态: ${permission.state}`, permission.state === 'granted' ? 'success' : 'error');
+                }
+                
+                // 请求麦克风访问
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { 
+                        channelCount: 1,
+                        sampleRate: 16000 
+                    } 
+                });
+                
+                log('✅ 麦克风权限获取成功！', 'success');
+                log(`🎵 音频轨道数量: ${stream.getAudioTracks().length}`, 'success');
+                
+                stream.getAudioTracks().forEach(track => {
+                    log(`📊 音频轨道: ${track.label}, 状态: ${track.readyState}`, 'success');
+                });
+                
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                }
+                mediaStream = stream;
+                
+            } catch (error) {
+                log(`❌ 麦克风权限错误: ${error.message}`, 'error');
+                log(`错误详情: ${error.name}`, 'error');
+            }
+        }
+        
+        async function testAudioRecording() {
+            if (!mediaStream) {
+                log('⚠️ 请先测试麦克风权限', 'warning');
+                return;
+            }
+            
+            try {
+                log('🎤 开始测试音频录制...', 'warning');
+                audioDataCount = 0;
+                
+                // 创建AudioContext
+                audioContext = new AudioContext({ sampleRate: 16000 });
+                log(`🔧 AudioContext创建成功，采样率: ${audioContext.sampleRate}Hz`, 'success');
+                
+                // 创建AudioWorklet处理器
+                const processorCode = `
+                    class TestProcessor extends AudioWorkletProcessor {
+                        constructor() {
+                            super();
+                            this.frameCount = 0;
+                        }
+                        
+                        process(inputs, outputs, parameters) {
+                            if (inputs.length > 0 && inputs[0].length > 0) {
+                                this.frameCount++;
+                                
+                                // 每100帧发送一次统计信息
+                                if (this.frameCount % 100 === 0) {
+                                    const inputChannel = inputs[0][0];
+                                    const rms = Math.sqrt(inputChannel.reduce((sum, val) => sum + val * val, 0) / inputChannel.length);
+                                    this.port.postMessage({
+                                        type: 'audio_data',
+                                        frameCount: this.frameCount,
+                                        dataLength: inputChannel.length,
+                                        rms: rms
+                                    });
+                                }
+                            }
+                            return true;
+                        }
+                    }
+                    registerProcessor('test-processor', TestProcessor);
+                `;
+                
+                const blob = new Blob([processorCode], { type: 'application/javascript' });
+                const workletURL = URL.createObjectURL(blob);
+                await audioContext.audioWorklet.addModule(workletURL);
+                
+                // 连接音频源
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                const workletNode = new AudioWorkletNode(audioContext, 'test-processor');
+                
+                source.connect(workletNode);
+                
+                // 监听音频数据
+                workletNode.port.onmessage = (event) => {
+                    if (event.data.type === 'audio_data') {
+                        audioDataCount++;
+                        log(`📊 音频数据 #${audioDataCount}: 帧数=${event.data.frameCount}, 长度=${event.data.dataLength}, RMS=${event.data.rms.toFixed(4)}`, 'success');
+                    }
+                };
+                
+                isRecording = true;
+                log('✅ 音频录制启动成功！请说话测试...', 'success');
+                
+                URL.revokeObjectURL(workletURL);
+                
+            } catch (error) {
+                log(`❌ 音频录制错误: ${error.message}`, 'error');
+                console.error('Audio recording error:', error);
+            }
+        }
+        
+        function stopRecording() {
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+            
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            
+            isRecording = false;
+            log(`🛑 录制停止。总共接收到 ${audioDataCount} 个音频数据包`, 'warning');
+        }
+        
+        // 页面加载时检查基本信息
+        window.onload = function() {
+            log('🌐 浏览器信息检查...', 'warning');
+            log(`User Agent: ${navigator.userAgent}`, 'info');
+            log(`是否支持MediaDevices: ${!!navigator.mediaDevices}`, 'info');
+            log(`是否支持AudioContext: ${!!window.AudioContext}`, 'info');
+            log(`是否支持AudioWorklet: ${!!window.AudioWorklet}`, 'info');
+            
+            if (!navigator.mediaDevices) {
+                log('❌ 浏览器不支持MediaDevices API', 'error');
+            }
+            
+            if (!window.AudioContext) {
+                log('❌ 浏览器不支持AudioContext', 'error');
+            }
+        };
+    </script>
+</body>
+</html> 
