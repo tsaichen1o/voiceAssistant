@@ -5,13 +5,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthProvider';
 import { createChatSession } from '@/services/api';
+import { RiRocket2Line } from 'react-icons/ri';
 
 export default function LandingPage() {
-  const [showLogo, setShowLogo] = useState(false);
-  const [showText, setShowText] = useState(false);
-  const [showButton, setShowButton] = useState(false);
-  // TODO: add chatSessionId to state
-  // const [chatSessionId, setChatSessionId] = useState<string | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
   const [creatingChatSession, setCreatingChatSession] = useState(false);
   const [dotCount, setDotCount] = useState(0);
 
@@ -19,11 +16,16 @@ export default function LandingPage() {
   const userId = user?.id || 'guest';
 
   useEffect(() => {
+    const timer = setTimeout(() => setIsAnimating(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (creatingChatSession) {
       interval = setInterval(() => {
         setDotCount((prev) => (prev + 1) % 4);
-      }, 300);
+      }, 400);
     } else {
       setDotCount(0);
     }
@@ -36,71 +38,73 @@ export default function LandingPage() {
     setCreatingChatSession(true);
     try {
       const session = await createChatSession();
-      // setChatSessionId(session.session_id);
-      setTimeout(() => {
-        window.location.href = `/chat/${userId}/${session.session_id}`;
-      }, 500);
+      window.location.href = `/chat/${userId}/${session.session_id}`;
     } catch {
-      alert('Failed to create chat session, please try again later');
+      alert('Failed to create a chat session. Please try again later.');
       setCreatingChatSession(false);
     }
   };
 
-  useEffect(() => {
-    const timers = [
-      setTimeout(() => setShowLogo(true), 100),
-      setTimeout(() => setShowText(true), 700),
-      setTimeout(() => setShowButton(true), 1300),
-    ];
-
-    return () => timers.forEach(clearTimeout);
-  }, []);
+  const getAnimationClass = (delay: string) => {
+    return `transform transition-all duration-700 ease-out ${delay} ${isAnimating
+        ? 'translate-y-0 opacity-100'
+        : 'translate-y-6 opacity-0'
+      }`;
+  };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#E7E7E7]">
-      <div
-        className={`transition-opacity duration-700 ${showLogo ? 'opacity-100' : 'opacity-0'
-          }`}
-      >
-        <Image
-          src="/icons/logo.png"
-          width={120}
-          height={120}
-          alt="go42TUM Logo"
-        />
-      </div>
+    <div className="flex flex-col h-screen w-screen items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white overflow-hidden">
+      <div className="relative z-10 flex flex-col items-center justify-center p-8 text-center max-w-lg">
+        <div className={getAnimationClass('delay-100')}>
+          <Image
+            src="/icons/logo.png"
+            width={110}
+            height={110}
+            alt="go42TUM Logo"
+            className="drop-shadow-lg rounded-3xl"
+            priority
+          />
+        </div>
 
-      <p
-        className={`mt-4 text-base sm:text-lg md:text-xl text-center text-gray-800 transition-opacity duration-700 ${showText ? 'opacity-100' : 'opacity-0'
-          }`}
-      >
-        Welcome to go42TUM! <br />
-        Your personal consultant for TUM applications.
-      </p>
+        <h1 className={`mt-6 text-3xl sm:text-4xl md:text-5xl font-bold text-gray-100 drop-shadow-md ${getAnimationClass('delay-300')}`}>
+          go42TUM
+        </h1>
 
-      <div className={`flex gap-4 mt-6 transition-opacity duration-700 ${showButton ? 'opacity-100' : 'opacity-0'}`}>
-        {!user ? (
-          <Link
-            href="/login"
-            className="px-4 py-2 border border-[#2F70B3] text-[#2F70B3] rounded-md text-sm sm:text-base md:text-lg bg-white hover:bg-[#f1f7ff] cursor-pointer"
-          >
-            Login
-          </Link>
-        ) : (
-          <button
-            onClick={handleStartNow}
-            className="px-4 py-2 bg-[#2F70B3] text-white rounded-md text-sm sm:text-base md:text-lg hover:bg-[#2F70B3]/80 transition-colors duration-300 cursor-pointer"
-            disabled={creatingChatSession}
-          >
-            {creatingChatSession ? (
-              <span>
-                Creating{'.'.repeat(dotCount)}
-              </span>
-            ) : (
-              'Start Now'
-            )}
-          </button>
-        )}
+        <p className={`mt-3 text-lg sm:text-xl text-gray-400 max-w-md ${getAnimationClass('delay-500')}`}>
+          Your personal AI consultant for TUM applications.
+        </p>
+
+        <div className={`mt-10 ${getAnimationClass('delay-700')}`}>
+          {!user ? (
+            <Link
+              href="/login"
+              className="px-8 py-3 border border-gray-600 text-gray-300 rounded-xl text-base sm:text-lg font-semibold bg-gray-800/50 hover:bg-gray-700/70 hover:border-gray-500 transition-all duration-300 cursor-pointer"
+            >
+              Login to Start
+            </Link>
+          ) : (
+            <button
+              onClick={handleStartNow}
+              className={`group relative flex items-center justify-center gap-3 px-8 py-3 bg-[#2b63b2] text-white rounded-xl text-base sm:text-lg font-semibold hover:bg-blue-500 shadow-lg shadow-blue-600/20 transition-all duration-300 transform hover:scale-105
+                ${creatingChatSession ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                disabled={creatingChatSession}
+              type='button'
+            >
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl blur opacity-0 group-hover:opacity-75 transition duration-500"></div>
+
+              <div className="relative flex items-center gap-3">
+                <RiRocket2Line className={`transition-transform duration-500 ${creatingChatSession ? 'animate-spin' : 'group-hover:rotate-[-45deg]'}`} />
+                {creatingChatSession ? (
+                  <span>
+                    Creating Session{'.'.repeat(dotCount)}
+                  </span>
+                ) : (
+                  'Start Now'
+                )}
+              </div>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,9 +1,12 @@
-import google.generativeai as genai
+from google.generativeai.client import configure
+from google.generativeai.generative_models import GenerativeModel
+from google.generativeai.types import GenerationConfig
+
 from app.config import settings
 from typing import List, Dict, Any
 
 # Configure Gemini client with API key from settings
-genai.configure(api_key=settings.GEMINI_API_KEY)
+configure(api_key=settings.GEMINI_API_KEY)
 
 
 async def generate_chat_completion(
@@ -26,7 +29,7 @@ async def generate_chat_completion(
     """
     try:
         # Initialize the model
-        gemini_model = genai.GenerativeModel(model)
+        gemini_model = GenerativeModel(model)
         
         # Convert messages to Gemini format
         # Gemini expects a conversation format, we'll concatenate user messages
@@ -42,7 +45,7 @@ async def generate_chat_completion(
         # Generate response
         response = gemini_model.generate_content(
             conversation_text,
-            generation_config=genai.types.GenerationConfig(
+            generation_config=GenerationConfig(
                 temperature=temperature,
                 max_output_tokens=max_tokens,
             )

@@ -99,3 +99,10 @@ class TranscriptionResponse(BaseModel):
     """Response model for voice transcription (for future use)."""
     text: str
     confidence: Optional[float] = None 
+
+# Email model
+class EmailRequest(BaseModel):
+    question: str
+
+class EmailResponse(BaseModel):
+    response: str
