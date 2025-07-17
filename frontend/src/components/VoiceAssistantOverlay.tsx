@@ -39,7 +39,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   const [isConnected, setIsConnected] = useState(false);
   const [isAudioMode, setIsAudioMode] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [lastResponse, setLastResponse] = useState<string>('');
+  const [transcript, setTranscript] = useState<string>('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const isSendingRef = useRef(false);
@@ -118,6 +118,8 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
       if (!isRecordingRef.current) {
         console.log('🎤 开始录制语音 - 音量:', volume.toFixed(3));
         isRecordingRef.current = true;
+        // Clear transcript when user starts speaking
+        setTranscript('');
       }
       
       // 清除静音超时
@@ -236,7 +238,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
             'Authorization': `Bearer ${token}`
           },
           signal: abortController.signal,
-          async           onopen(response) {
+          async onopen(response) {
             if (response.ok) {
               console.log('🔗 OpenSource Voice SSE connection established');
               setIsConnected(true);
@@ -300,18 +302,19 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     
     if (message.type === 'text' && (message.data || message.text)) {
       const textContent = message.data || message.text || '';
-      setLastResponse(textContent);
-      // When we receive text, system is about to speak
-      setIsSpeaking(true);
       
-      // Set a timeout to reset speaking state (fallback)
-      if (speakingTimeoutRef.current) {
-        clearTimeout(speakingTimeoutRef.current);
+      // Check if this is a transcript message (from Whisper)
+      const transcriptMatch = textContent.match(/^👤 You said: "(.+)"$/);
+      if (transcriptMatch) {
+        const transcriptText = transcriptMatch[1];
+        setTranscript(transcriptText);
+        console.log('🎤 Transcript received:', transcriptText);
+        return;
       }
-      speakingTimeoutRef.current = setTimeout(() => {
-        setIsSpeaking(false);
-        console.log('🔇 Speaking timeout - resetting to listening');
-      }, 10000); // 10 seconds timeout
+      
+      // Skip all other text messages - we only want to show transcript
+      console.log('🔄 Text message ignored (not transcript):', textContent);
+      return;
       
     } else if (message.type === 'audio' && message.data) {
       // Handle both PCM and MP3 audio formats
@@ -730,7 +733,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     setIsAudioMode(false);
     setPaused(false);
     setIsSpeaking(false);
-    setLastResponse('');
+    setTranscript('');
     setSessionId(null);
     sessionIdRef.current = null;
     audioBufferRef.current = [];
@@ -784,9 +787,20 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
       <main className="flex-1 flex flex-col items-center justify-center -mt-10">
         <div className="h-24 text-center">
-          <p className={`text-2xl font-semibold transition-opacity duration-300 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-            {lastResponse}
-          </p>
+          {/* Display transcript from Whisper */}
+          {transcript && (
+            <p
+              className={`
+                rounded-sm bg-black/50 px-2 py-2
+                text-l font-medium text-white shadow-lg
+                transition-opacity duration-300
+                whitespace-pre-wrap
+              `}
+            >
+              <span className="mr-2">🗣️</span>
+              {transcript}
+            </p>
+          )}
         </div>
 
         <div className="relative w-64 h-64 flex items-center justify-center z-0">
