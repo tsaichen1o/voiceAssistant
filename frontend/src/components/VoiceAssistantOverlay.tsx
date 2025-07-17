@@ -59,6 +59,7 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
   const eventSourceRef = useRef<AbortController | null>(null);
   const audioBufferRef = useRef<Uint8Array[]>([]);
   const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const textBufferRef = useRef<string>('');
 
   useEffect(() => {
     if (isSpeaking && volume > 0.1) {
@@ -289,6 +290,9 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     // 2. Ensure the sending flag is reset.
     isSendingRef.current = false;
 
+    // 3. Clear the text buffer to avoid stale text.
+    textBufferRef.current = '';
+
     if (audioRecorderContextRef.current?.state === 'suspended') {
       audioRecorderContextRef.current.resume();
       console.log('🎙️ Resume recording');
@@ -325,22 +329,37 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
     }
 
     if (message.type === 'text') {
-      setTranscript('');
-      setLastResponse(typeof message.data === 'string' ? message.data : '');
-      startSpeaking();
+      // Instead of displaying the text, buffer it.
+      if (typeof message.data === 'string') {
+        // If it's the very first chunk of a new response, clear the user's transcript
+        if (textBufferRef.current === '') {
+          setTranscript('');
+        }
+        textBufferRef.current += message.data;
+      }
 
+      // Set a longer timeout in case audio never arrives for this text
       if (speakingTimeoutRef.current) clearTimeout(speakingTimeoutRef.current);
       speakingTimeoutRef.current = setTimeout(stopSpeaking, 20000);
+
     } else if (message.type === 'audio' && message.data) {
-      setTranscript('');
+      // This is our synchronization point!
+      // 1. Move the buffered text to the display state NOW.
+      setLastResponse(textBufferRef.current);
+      // 2. Clear the buffer for the next sentence.
+      textBufferRef.current = '';
+
       if (audioPlayerNodeRef.current) {
-        startSpeaking();
+        startSpeaking(); // Set speaking state and suspend recording
+
+        // 3. Play the audio.
         if (typeof message.data === 'string') {
           audioPlayerNodeRef.current.port.postMessage(base64ToArray(message.data));
         } else {
           console.warn('Expected audio data as base64 string but got:', message.data);
         }
 
+        // Reset the speaking timeout for the duration of the audio playback
         if (speakingTimeoutRef.current) clearTimeout(speakingTimeoutRef.current);
         speakingTimeoutRef.current = setTimeout(stopSpeaking, 10000);
       }
@@ -501,9 +520,37 @@ export default function VoiceAssistantOverlay({ isOpen, onClose, isDarkMode }: V
 
       <main className="flex-1 flex flex-col items-center justify-center -mt-10">
         <div className="h-24 text-center">
-          <p className={`text-2xl font-semibold transition-opacity duration-300 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-            {transcript || lastResponse}
-          </p>
+            {/* TODO: Implement transcript of the assistant */}
+            {/* {(transcript || lastResponse) && (
+              <p
+                className={`
+                  rounded-sm bg-black/50 px-2 py-2
+                  text-l font-medium text-white shadow-lg
+                  transition-opacity duration-300
+                  whitespace-pre-wrap
+                `}
+              >
+                <span className="mr-2">
+                  {transcript ? '🗣️' : '🤖'}
+                </span>
+                {transcript || lastResponse}
+              </p>
+            )} */}
+          {transcript && (
+            <p
+              className={`
+                  rounded-sm bg-black/50 px-2 py-2
+                  text-l font-medium text-white shadow-lg
+                  transition-opacity duration-300
+                  whitespace-pre-wrap
+                `}
+            >
+              <span className="mr-2">
+                {transcript ? '🗣️' : '🤖'}
+              </span>
+              {transcript}
+            </p>
+          )}
         </div>
 
         <div className="relative w-64 h-64 flex items-center justify-center z-0">
