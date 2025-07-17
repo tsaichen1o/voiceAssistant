@@ -21,7 +21,7 @@ from app.config import settings
 os.environ["PATH"] += os.pathsep + r"C:\Users\huhan\App\ffmpeg\bin"
 
 from app.services.asr import transcribe
-from app.services.tts import safe_synthesize_speech
+from app.services.tts import async_safe_synthesize_speech
 
 load_dotenv()
 
@@ -105,6 +105,10 @@ class RedisVoiceService:
                 audio_np_array = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
                 self.audio_buffer.setdefault(session_id, []).extend(audio_np_array.tolist())
 
+                print(f"🎵 [AUDIO] Received {len(audio_bytes)} bytes, {len(audio_np_array)} samples")
+                print(f"📊 [AUDIO] Total buffer size: {len(self.audio_buffer[session_id])} samples")
+                print(f"🎯 [AUDIO] Required for processing: {int(SAMPLE_RATE * BUFFER_SECONDS)} samples")
+
                 yield {
                     "type": "status",
                     "session_id": session_id,
@@ -113,14 +117,28 @@ class RedisVoiceService:
                 }
 
                 buffer = np.array(self.audio_buffer[session_id], dtype=np.float32)
+                buffer_length = len(buffer)
+                required_length = int(SAMPLE_RATE * BUFFER_SECONDS)
+                
+                print(f"🔍 [AUDIO] Buffer check: {buffer_length} >= {required_length} ? {buffer_length >= required_length}")
+                
                 if len(buffer) >= int(SAMPLE_RATE * BUFFER_SECONDS):
+                    print(f"🎤 [ASR] Buffer size reached! Processing {len(buffer)} samples...")
                     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_wav:
                         sf.write(tmp_wav.name, buffer, SAMPLE_RATE)
+                        print(f"📁 [ASR] Saved audio to temp file: {tmp_wav.name}")
 
                     # import fast whisper
+                    print(f"🗣️ [ASR] Starting Whisper transcription...")
                     try:
                         transcript_text, transcript_lang = transcribe(buffer, sample_rate=SAMPLE_RATE)
+                        print(f"✅ [ASR] Transcription successful!")
+                        print(f"📝 [ASR] Text: '{transcript_text}'")
+                        print(f"🌐 [ASR] Language: {transcript_lang}")
                     except Exception as e:
+                        print(f"❌ [ASR] Whisper error: {str(e)}")
+                        import traceback
+                        traceback.print_exc()
                         yield {"type": "error", "message": f"Whisper error: {str(e)}"}
                         return
 
@@ -128,6 +146,7 @@ class RedisVoiceService:
                     #     yield {"type": "error", "message": "No speech detected."}
                     #     return
 
+                    print(f"📤 [ASR] Sending transcript event to client...")
                     yield {
                         "type": "transcript",
                         "session_id": session_id,
@@ -140,9 +159,11 @@ class RedisVoiceService:
                     }
 
                     # ✅ Gemini AI text processing
+                    print(f"🚀 [PROCESSING] Starting Gemini text processing for: '{transcript_text.strip()[:50]}...'")
                     async for event in self._process_text_with_gemini(session_data, transcript_text):
                         yield event
                         
+                    print(f"🧹 [AUDIO] Clearing audio buffer (had {len(self.audio_buffer[session_id])} samples)")
                     self.audio_buffer[session_id] = []
 
             elif mime_type == "text/plain":
@@ -204,57 +225,109 @@ class RedisVoiceService:
             summary_text = getattr(search_response.summary, "summary_text", "") if hasattr(search_response, "summary") else ""
 
             # ========== 2. Prompt ==========
+            # Build basic prompt (for versions that don't support system_instruction, include system instruction)
+            system_prompt = "You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging. Do not use ANY emojis in your responses."
+            
             prompt = (
-                "You are a helpful voice assistant. Respond naturally and helpfully. Avoid emojis.\n\n"
+                f"{system_prompt}\n\n"
                 f"--- Context ---\n{summary_text}\n--- END CONTEXT ---\n\n"
                 f"User question: {content}"
             )
             # ========== 3. Gemini generation ==========
-            model = GenerativeModel(
-                model_name=settings.GEMINI_MODEL,
-                system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging. Do not use ANY emojis in your responses."
-            )
-            chat = model.start_chat(history=[
-                {"role": "user", "parts": [content]}
-            ])
-            response = chat.send_message(prompt, stream=True)
+            try:
+                # Try to use new API version (supports system_instruction)
+                model = GenerativeModel(
+                    model_name=settings.GEMINI_MODEL,
+                    system_instruction="You are a helpful voice assistant. Respond naturally and helpfully to user queries. Keep responses conversational and engaging. Do not use ANY emojis in your responses."
+                )
+                print(f"✅ [GEMINI] Using new API with system_instruction")
+            except TypeError as e:
+                if "system_instruction" in str(e):
+                    # Fallback to old API version (doesn't support system_instruction)
+                    print(f"⚠️ [GEMINI] system_instruction not supported, using fallback")
+                    model = GenerativeModel(model_name=settings.GEMINI_MODEL)
+                else:
+                    raise e
+            # Start conversation (use simplified history format for compatibility with different versions)
+            try:
+                chat = model.start_chat(history=[])
+                print(f"✅ [GEMINI] Chat session started")
+            except Exception as e:
+                print(f"❌ [GEMINI] Failed to start chat: {e}")
+                raise e
+            
+            print(f"📤 [GEMINI] Sending prompt to model...")
+            print(f"📝 [GEMINI] Prompt length: {len(prompt)} chars")
+            
+            try:
+                response = chat.send_message(prompt, stream=True)
+                print(f"✅ [GEMINI] Streaming response started")
+            except Exception as e:
+                print(f"❌ [GEMINI] Failed to send message: {e}")
+                raise e
 
             # ========== 4. Audio streaming synthesis + output ==========
             sentence_buffer = ""
             full_response_text = ""
             sentence_delimiters = re.compile(r'(?<=[.!])\s*')
 
-
+            print(f"📝 [GEMINI] Starting to process Gemini response stream...")
+            chunk_count = 0
             for chunk in response:
+                chunk_count += 1
+                print(f"📦 [GEMINI] Chunk {chunk_count}: {chunk.text if chunk.text else 'NO TEXT'}")
                 if not chunk.text:
                     continue
                 yield {"type": "text", "data": chunk.text, "partial": True}
                 sentence_buffer += chunk.text
                 full_response_text += chunk.text
+                print(f"📝 [GEMINI] Current sentence buffer: '{sentence_buffer[:100]}...'")
 
                 sentences = sentence_delimiters.split(sentence_buffer)
+                print(f"✂️ [SENTENCE] Split buffer into {len(sentences)} parts: {[s[:30]+'...' for s in sentences]}")
                 if len(sentences) > 1:
+                    print(f"🎯 [SENTENCE] Processing {len(sentences)-1} complete sentences")
                     for sentence in sentences[:-1]:
                         if sentence.strip():
-                            audio = safe_synthesize_speech(sentence.strip())
+                            print(f"🔊 [TTS] Generating audio for sentence: '{sentence.strip()[:50]}...'")
+                            audio = await async_safe_synthesize_speech(sentence.strip())
                             if audio:
+                                print(f"✅ [TTS] Generated audio: {len(audio)} bytes")
                                 yield {
                                     "type": "audio",
                                     "session_id": session_data["session_id"],
                                     "mime_type": "audio/wav",
                                     "data": base64.b64encode(audio).decode("utf-8")
                                 }
+                            else:
+                                print(f"❌ [TTS] Failed to generate audio for: '{sentence.strip()[:50]}...'")
+                        else:
+                            print(f"⏩ [TTS] Skipping empty sentence")
                     sentence_buffer = sentences[-1]
+                    print(f"📝 [SENTENCE] Remaining buffer: '{sentence_buffer[:50]}...'")
+                else:
+                    print(f"📝 [SENTENCE] No complete sentences yet, continuing...")
 
+            print(f"🏁 [GEMINI] Stream ended. Final processing...")
+            print(f"📊 [GEMINI] Total chunks processed: {chunk_count}")
+            print(f"📝 [GEMINI] Full response length: {len(full_response_text)}")
+            print(f"📝 [GEMINI] Final sentence buffer: '{sentence_buffer.strip()[:100]}...'")
+            
             if sentence_buffer.strip():
-                final_audio = safe_synthesize_speech(sentence_buffer.strip())
+                print(f"🔊 [TTS] Generating final audio for: '{sentence_buffer.strip()[:50]}...'")
+                final_audio = await async_safe_synthesize_speech(sentence_buffer.strip())
                 if final_audio:
+                    print(f"✅ [TTS] Generated final audio: {len(final_audio)} bytes")
                     yield {
                         "type": "audio",
                         "session_id": session_data["session_id"],
                         "mime_type": "audio/wav",
                         "data": base64.b64encode(final_audio).decode("utf-8")
                     }
+                else:
+                    print(f"❌ [TTS] Failed to generate final audio for: '{sentence_buffer.strip()[:50]}...'")
+            else:
+                print(f"⏩ [TTS] No final sentence buffer to process")
 
             yield {"type": "text", "data": "", "partial": False}
 

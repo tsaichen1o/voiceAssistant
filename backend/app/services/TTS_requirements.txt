@@ -1,10 +1,4 @@
 faster_whisper
-# for coqui
-TTS
-soundfile>=0.12.0
-numpy==1.22.0;python_version<="3.10"
-numpy>=1.24.3;python_version>"3.10"
+# for edge-tts (Microsoft Edge Text-to-Speech)
+edge-tts>=6.1.0
 
-# for speechbrain
-# speechbrain
-# sentencepiece 
