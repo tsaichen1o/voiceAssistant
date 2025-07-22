@@ -1,6 +1,6 @@
 <img src="tum_logo.svg" alt="TUM Logo" width="60" align="right">
 
-# 🗣️ go42TUM Project Management Report
+# 🗣️ **go42TUM Project Management Report**
 > A Real-Time Voice AI Consultant for TUM Applicants
 
 **Group:** 5  <br/>
