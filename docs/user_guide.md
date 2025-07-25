@@ -1,12 +1,80 @@
-# 🗣️ **go42TUM User Guide**
-> A Voice Assistant for TUM Application
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
 
-**Group:** 5  <br/>
-**Live Demo:** [https://voice-assistant-gilt.vercel.app/](https://voice-assistant-gilt.vercel.app/) <br/>
-**GitHub Repository:** [https://github.com/tsaichen1o/voiceAssistant](https://github.com/tsaichen1o/voiceAssistant)
+* {
+    font-family: 'Montserrat', sans-serif !important;
+}
 
----
-## **1. Introduction**
+body, html {
+    font-family: 'Montserrat', sans-serif !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Montserrat', sans-serif !important;
+    font-weight: 600;
+}
+
+p, span, div, li, td, th, blockquote, pre {
+    font-family: 'Montserrat', sans-serif !important;
+}
+
+code {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+    color: green;
+    background-color: #f8f9fa;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+a, a:hover, a:visited {
+    font-family: 'Montserrat', sans-serif !important;
+}
+
+strong, b, em, i {
+    font-family: 'Montserrat', sans-serif !important;
+}
+
+ul, ol, dl {
+    font-family: 'Montserrat', sans-serif !important;
+}
+
+table {
+    font-family: 'Montserrat', sans-serif !important;
+}
+
+input, textarea, select, button {
+    font-family: 'Montserrat', sans-serif !important;
+}
+</style>
+
+
+<img src="tum_logo.svg" alt="TUM Logo" width="60" align="right">
+
+<div style="font-family: 'Montserrat', sans-serif;">
+
+# **User Guide**
+> A Real-Time Voice AI Consultant for TUM Applicants
+
+<div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #0e4378; margin: 20px 0;">
+<strong>Group:</strong> 5  <br/>
+<strong>Live Demo:</strong> <a href="https://voice-assistant-gilt.vercel.app/">https://voice-assistant-gilt.vercel.app/</a> <br/>
+<strong>GitHub Repository:</strong> <a href="https://github.com/tsaichen1o/voiceAssistant">https://github.com/tsaichen1o/voiceAssistant</a>
+</div>
+
+<span style="border-bottom: 1px solid #BDC3C7;display: block;"></span>
+
+1. **[Introduction](#introduction)**
+2. **[Getting Started](#getting-started)**
+3. **[Key Features](#key-features)**
+4. **[FAQs & Troubleshooting](#faqs--troubleshooting)**
+
+<span style="border-bottom: 1px solid #BDC3C7;display: block;"></span>
+
+<div style="page-break-after: always; visibility: hidden"> 
+\pagebreak 
+</div>
+
+## <span id="introduction" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">1. Introduction</span>
 **go42TUM** (pronounced "go-for-TUM") is an intelligent voice assistant specifically designed to help prospective students navigate TUM's application process. The name represents our mission to make it easier for everyone to "go for TUM" - to pursue their educational dreams at Technical University of Munich without barriers. **go42TUM** integrates voice-first interaction, real-time guidance, multilingual capabilities, and session tracking to enhance usability and streamline the application process.
 
 <p align="center">
@@ -26,7 +94,7 @@ User type in or speak to tum application related problems.
 3. Gemini generates an enhanced response based on both the user's input and the retrieved results.
 4. The user receives a response in text or audio format.
 
-## **2. Getting Started**
+## <span id="getting-started" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">2. Getting Started</span>
 💻 **System Requirements**
 
 1. Recommended browsers: Chrome or Edge.
@@ -56,7 +124,7 @@ User type in or speak to tum application related problems.
 <img src="pics/UserGuideReport_image5.png" width="50%">
 </p>
 
-## **3. Key Features**
+## <span id="key-features" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">3. Key Features</span>
 
 🔊 **Voice-First Interaction**
 
@@ -94,9 +162,9 @@ When the system encounters questions beyond its knowledge base, this agent will 
 <img src="pics/UserGuideReport_image4.png" width="100%">
 </p>
 
-## **4. FAQS & TROUBLESHOOTING**
+## <span id="faqs--troubleshooting" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">4. FAQS & Troubleshooting</span>
 
-### 🛠️ Common Issues & Solutions
+### <span id="design-principles--architectural-overview" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">🛠️ Common Issues & Solutions</span>
 
 | **Issue**                       | **Recommended Solution**                                                                                                                              |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -104,3 +172,4 @@ When the system encounters questions beyond its knowledge base, this agent will 
 | 🌐 **Fails to Connect**          | Switch to a different network or check your firewall settings. University or corporate networks (e.g., *eduroam*) may block required API connections. |
 | 📧 **Email Agent Not Triggered** | Ensure the input contains **only** a properly formatted email address — no extra characters, spaces, or messages.                                     |
 
+</div>
