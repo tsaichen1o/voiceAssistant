@@ -24,6 +24,12 @@ harm TUM’s reputation.
 
 ### Safety Tests
 
+Our testing scripts and the test results are documented here and available for review.
+
+Collected Test Data and Results: [test_results_15072025](https://github.com/tsaichen1o/voiceAssistant/tree/main/backend/app/tests/test_results_15072025)
+
+Test Automation Scripts: [main/backend/app/tests](https://github.com/tsaichen1o/voiceAssistant/tree/main/backend/app/tests)
+
 #### 1. Accuracy Testing
 
 **Challenges**
@@ -72,8 +78,7 @@ Third, we checked whether the Test Chatbot Agent’s assessments of the chatbot�
 answers were valid. We found **one** case where the chatbot's answer was 
 actually correct, but it was mistakenly marked as incorrect. Additionally, in 
 **two** cases, the chatbot responded with “I cannot find the relevant 
-information,” but the agent still marked those as incorrect. We believe this 
-was a misunderstanding, as the chatbot behaved correctly in those situations.
+information,” but the agent still marked those as incorrect.
 
 #### 2. Prompt Attacks Safety Testing
 
