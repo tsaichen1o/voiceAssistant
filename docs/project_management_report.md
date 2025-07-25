@@ -20,6 +20,10 @@ p, span, div, li, td, th, blockquote, pre {
 
 code {
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+    color: green;
+    background-color: #f8f9fa;
+    padding: 2px 4px;
+    border-radius: 3px;
 }
 
 a, a:hover, a:visited {
@@ -42,6 +46,7 @@ input, textarea, select, button {
     font-family: 'Montserrat', sans-serif !important;
 }
 </style>
+
 
 <img src="tum_logo.svg" alt="TUM Logo" width="60" align="right">
 
@@ -81,6 +86,8 @@ input, textarea, select, button {
 <div style="page-break-after: always; visibility: hidden"> 
 \pagebreak 
 </div>
+<!-- <div class="page-break"></div> -->
+
 
 ## <span id="project-vision" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">1. Project Vision</span>
 
@@ -126,6 +133,10 @@ Based on these principles, we adopted an **microservices architecture**. All cor
 
 The following diagram provides a comprehensive overview of the high-level system architecture, illustrating the interaction between all core components.
 
+<div style="page-break-after: always; visibility: hidden"> 
+\pagebreak 
+</div>
+
 <img src="architecture_diagram.png" alt="System Architecture Diagram">
 <br/>
 
@@ -144,7 +155,7 @@ The following diagram provides a comprehensive overview of the high-level system
 **3.2.3 AI & Data Services**
 
 * **Technology Stack:** Gemini Flash API, Vertex AI Search, Google Cloud Storage
-* **Responsibilities:** This is the core of our intelligent dialogue system. The **Gemini Flash API** serves as the LLM for understanding user intent and generating natural language responses. To provide accurate, fact-based answers, we implemented a Retrieval-Augmented Generation (RAG) pattern. The system uses **Vertex AI Search** to perform efficient semantic searches over documents stored in our **Cloud Storage** knowledge base, feeding relevant context to Gemini and improving response fidelity.
+* **Responsibilities:** This is the core of our intelligent dialogue system. The **Gemini Flash API** serves as the LLM for understanding user intent and generating natural language  responses. To provide accurate, fact-based answers, we implemented a Retrieval-Augmented Generation (RAG) pattern. The system uses **Vertex AI Search** to perform efficient semantic searches over documents stored in our **Cloud Storage** knowledge base, feeding relevant context to Gemini and improving response fidelity.
 
 **3.2.4 Voice Processor**
 
