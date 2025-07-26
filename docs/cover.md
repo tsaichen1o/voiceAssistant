@@ -20,7 +20,7 @@ body, html {
     align-items: center;
     text-align: center;
     color: #2C3E50;
-    padding: 40px;
+    padding: 20px;
     box-sizing: border-box;
 }
 
@@ -219,5 +219,51 @@ body, html {
         <p>School of Computation, Information and Technology</p>
         <p>[CITHN2014] Foundations and Application of Generative AI</p>
         <p>Summer Semester 2025</p>
+        <p>27.07.2025</p>
+    </div>
+</div>
+
+<div class="cover-page" style="min-height: 100vh; justify-content: flex-start; padding-top: 60px;">
+    <div style="max-width: 800px; text-align: left; color: #2C3E50;">
+        <h1 style="font-size: 2.0em; font-weight: 600; color: #2C3E50; text-align: left; margin-bottom: 30px; border-bottom: 2px solid #0e4378; padding-bottom: 15px;">
+            Acknowledgments of Generative AI Usage
+        </h1>
+        <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #0e4378;">
+            <p style="font-style: italic; color: #0e4378; font-weight: 500; margin: 0; font-size: 1.1em;">
+                In accordance with the course policy on the use of Generative AI, this section details how our team utilized GenAI tools as an assistant in the creation of this project report and its accompanying documents.
+            </p>
+        </div>
+        <p style="font-size: 1.0em; line-height: 1.6; margin-bottom: 20px;">
+            Our approach was to leverage AI to enhance productivity and improve the quality of our work, while ensuring that all core concepts, analysis, and final decisions remained our own. The primary applications of GenAI in our workflow included:
+        </p>
+        <div style="margin: 25px 0;">
+            <h3 style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; font-size: 1.2em; margin-bottom: 10px; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">
+                Conceptualization and Structuring
+            </h3>
+            <p style="font-size: 1.0em; line-height: 1.6; margin-left: 0;">
+                During the initial phases, we used GenAI to brainstorm and generate foundational outlines for complex report sections, such as "System Design & Architecture" and "Methodology & Approach." This provided a solid starting point, which was then substantially expanded, detailed, and validated by the team's own expertise and research.
+            </p>
+        </div>
+        <div style="margin: 25px 0;">
+            <h3 style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; font-size: 1.2em; margin-bottom: 10px; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">
+                Language Refinement and Polishing
+            </h3>
+            <p style="font-size: 1.0em; line-height: 1.6; margin-left: 0;">
+                Throughout the writing process, GenAI served as a sophisticated writing assistant. We employed it to paraphrase and shorten verbose sentences for better clarity, refine the professional and formal tone of the document, and ensure linguistic consistency across sections contributed by different team members.
+            </p>
+        </div>
+        <div style="margin: 25px 0;">
+            <h3 style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; font-size: 1.2em; margin-bottom: 10px; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">
+                Formatting and Content Generation
+            </h3>
+            <p style="font-size: 1.0em; line-height: 1.6; margin-left: 0;">
+                GenAI was also used for several practical formatting tasks. This included generating clean Markdown for tables, assisting in the creation and structuring of the table of contents, and helping to design professional layouts for various report components.
+            </p>
+        </div>
+        <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 25px 0; border-left: 4px solid #0e4378; text-align: center;">
+            <p style="font-style: italic; color: #2C3E50; margin: 0; font-size: 0.95em;">
+                <strong>Meta-Disclosure:</strong> This "Acknowledgments of Generative AI Usage" section itself was generated using GenAI tools and subsequently reviewed and approved by our team to ensure accuracy and completeness of our AI usage disclosure.
+            </p>
+        </div>
     </div>
 </div>
