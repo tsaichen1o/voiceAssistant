@@ -142,8 +142,8 @@ body, html {
 }
 
 .university-info {
-    margin-top: 50px;
-    padding-top: 30px;
+    margin-top: 40px;
+    padding-top: 10px;
     border-top: 1px solid #e9ecef;
     opacity: 0.8;
     color: #2C3E50;
@@ -217,7 +217,7 @@ body, html {
     <div class="university-info">
         <h4>Technical University of Munich (TUM)</h4>
         <p>School of Computation, Information and Technology</p>
-        <p>Foundations and Application of Generative AI</p>
+        <p>[CITHN2014] Foundations and Application of Generative AI</p>
         <p>Summer Semester 2025</p>
     </div>
 </div>
