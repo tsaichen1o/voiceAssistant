@@ -63,10 +63,23 @@ input, textarea, select, button {
 
 <span style="border-bottom: 1px solid #BDC3C7;display: block;"></span>
 
-1. **[Introduction](#introduction)**
-2. **[Getting Started](#getting-started)**
-3. **[Key Features](#key-features)**
-4. **[FAQs & Troubleshooting](#faqs--troubleshooting)**
+1. **[Introduction](#introduction)** <br/>
+    [1.1 Who is it for?](#who-is-it-for) <br/>
+    [1.2 How does it work?](#how-does-it-work) <br/>
+2. **[Getting Started](#getting-started)** <br/>
+    [2.1 System Requirements](#system-requirements) <br/>
+    [2.2 Accessing the Application](#accessing-the-application) <br/>
+    [2.3 UI Overview](#ui-overview) <br/>
+3. **[Key Features](#key-features)** <br/>
+    [3.1 Voice-First Interaction](#voice-first-interaction) <br/>
+    [3.2 Instant Application Guidance](#instant-application-guidance) <br/>
+    [3.3 AI-Powered Response Generation](#ai-powered-response-generation) <br/>
+    [3.4 Smart FAQ System](#smart-faq-system) <br/>
+    [3.5 Chat History Storage](#chat-history-storage) <br/>
+    [3.6 Email Agent](#email-agent) <br/>
+4. **[FAQs & Troubleshooting](#faqs--troubleshooting)** <br/>
+    [4.1 Best Practice](#best-practice) <br/>
+    [4.2 Common Issues & Solutions](#common-issues--solutions) <br/>
 
 <span style="border-bottom: 1px solid #BDC3C7;display: block;"></span>
 
@@ -81,13 +94,13 @@ input, textarea, select, button {
 <img src="pics/UserGuideReport_image1.png" width="30%">
 </p>
 
-### <span id="Who is it for?" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">1.1 Who is it for?</span>
+### <span id="who-is-it-for" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">1.1 Who is it for?</span>
 
 - **International students** who may face language or navigation barriers.
 - **Visually impaired users** or those with accessibility needs, benefiting from the voice-first design.
 - **Busy individuals** looking for quick, accurate guidance without digging through multiple web pages.
 
-### <span id="How does it work?" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">1.2 How does it work?</span>
+### <span id="how-does-it-work" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">1.2 How does it work?</span>
 
 1. The user types or speaks a question related to the TUM application process—such as admission deadlines, required documents, or program requirements.
 2. The system analyzes the query and retrieves relevant information using **Vertex AI Search**, ensuring responses are accurate and up-to-date.
@@ -96,17 +109,17 @@ input, textarea, select, button {
 
 ## <span id="getting-started" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">2. Getting Started</span>
 
-### <span id="System Requirements" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">2.1 System Requirements</span>
+### <span id="system-requirements" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">2.1 System Requirements</span>
 1. Recommended browsers: Chrome or Edge.
 2. Stable internet connection required.
 3. Must support microphone access for voice features.
 
-### <span id="Accessing the Applicatio" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">2.2 Accessing the Applicatio</span>
+### <span id="accessing-the-application" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">2.2 Accessing the Application</span>
 
 1. Open the application and log in using email.
 2. Login success leads you directly to the app’s main interface.
 
-### <span id="UI Overview" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">2.3 UI Overview</span>
+### <span id="ui-overview" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">2.3 UI Overview</span>
 
 1. **Chat History/Navigation Panel (Left Sidebar):** This panel displays "Chat History" and lists past conversations. The "+ New Chat" button allows users to initiate a new conversation. This functions as the primary navigation area.
 2. **Frequently Asked Questions (Main Content Area):** This section presents common queries, providing quick access to information. The visible questions are:
@@ -114,21 +127,24 @@ input, textarea, select, button {
     - "What documents are required?"
     - "How can I contact support?"
 3. **Chat Input Area (Bottom Bar):** This area, labeled "Ask anything...", allows users to type in their questions or requests. The icon on the far right (resemblg a chat bubble with a person) is for sending the message or accessing chat-related settings.
-
 4. **Evening Modine / Morning Mode Toggle:** This feature allows users to switch between light (morning) and dark (evening) themes for better visual comfort depending on the time of day or user preference. The toggle is usually represented by a sun 🌞 or moon 🌙 icon and ensures accessibility and reduced eye strain during prolonged usage.
 
 <p align="center">
 <img src="pics/UserGuideReport_image5.png" width="50%">
 </p>
 
+<div style="page-break-after: always; visibility: hidden"> 
+\pagebreak 
+</div>
+
 ## <span id="key-features" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">3. Key Features</span>
 
-### <span id="Voice-First Interaction" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.1 Voice-First Interaction</span>
+### <span id="voice-first-interaction" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.1 Voice-First Interaction</span>
 
-Natural voice conversations with real-time audio processing and intelligent interruption detection, enabling a smooth and human-like interaction. The system supports both speech-to-text and text-to-speech, making it highly accessible for visually impaired users or those on the go.
+Natural voice conversations with real-time audio processing and interruption detection, enabling a smooth and human-like interaction. The system supports both speech-to-text and text-to-speech, making it highly accessible for visually impaired users or those on the go.
 
 
-### <span id="Instant Application Guidancee" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.2 Instant Application Guidancee</span>
+### <span id="instant-application-guidance" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.2 Instant Application Guidance</span>
 
 The system provides real-time answers to TUM application-related questions by retrieving the most relevant and up-to-date information from trusted sources, significantly reducing the time and effort required to search through multiple web pages. It covers key topics such as deadlines, required documents, and admission procedures.
 
@@ -136,15 +152,15 @@ The system provides real-time answers to TUM application-related questions by re
 <img src="pics/UserGuideReport_image2.png" width="100%">
 </p>
 
-### <span id="AI-Powered Response Generation" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.3 AI-Powered Response Generation</span>
+### <span id="ai-powered-response-generation" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.3 AI-Powered Response Generation</span>
 
 Powered by Gemini and Vertex AI Search, the system generates accurate and context-aware responses based on user queries and retrieved information. It understands natural language input, supports follow-up questions, and adapts to the conversation flow to deliver personalized, coherent answers.
 
-### <span id="Smart FAQ System" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.4 Smart FAQ System</span>
+### <span id="smart-faq-system" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.4 Smart FAQ System</span>
 
 Dynamic suggestions and clickable FAQ items for common questions. The system learns from user interactions and frequently asked queries to improve recommendations over time, making information discovery even faster and more intuitive.
 
-### <span id="Chat History Storage" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.5 Chat History Storage</span>
+### <span id="chat-history-storage" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.5 Chat History Storage</span>
 
 Provides users with persistent chat history and context-aware conversations. Users can revisit previous interactions at any time, track the progression of their queries, and pick up seamlessly from where they left off. The system intelligently maintains session context, enabling more natural follow-up questions without the need to rephrase or repeat earlier input. This continuity not only saves time but also enhances the overall user experience by making the conversation feel more fluid, personalized, and human-like.
 
@@ -152,11 +168,9 @@ Provides users with persistent chat history and context-aware conversations. Use
 <img src="pics/UserGuideReport_image3.png" width="100%">
 </p>
 
-### <span id="📩 Email Agent" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.5 Email Agent</span>
+### <span id="email-agent" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.6 Email Agent</span>
 
 When the system encounters questions beyond its current knowledge base, the email agent is triggered to ensure seamless support continuity. It intelligently analyzes the user's query and auto-generates a well-structured, polite, and context-rich email draft addressed to the appropriate TUM department or contact point. Users can review, customize, or directly send the message with minimal effort, eliminating the need to search for email addresses or write formal inquiries themselves. This feature ensures that even the most complex or uncommon questions are routed to the right human experts—guaranteeing that no user concern goes unresolved and providing a safety net beyond automated responses.
-
-
 
 <p align="center">
 <img src="pics/UserGuideReport_image4.png" width="100%">
@@ -164,32 +178,32 @@ When the system encounters questions beyond its current knowledge base, the emai
 
 ## <span id="faqs--troubleshooting" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">4. FAQS & Troubleshooting</span>
 
-### <span id="design-principles--architectural-overview" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">4.1 Best Practice</span>
+### <span id="best-practice" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">4.1 Best Practice</span>
 
 To ensure an optimal user experience and maximize the value of the voice-based TUM assistant, the following best practices are recommended:
 
-#### 1. Start with Specific, Goal-Oriented Queries
+**1. Start with Specific, Goal-Oriented Queries** <br/>
 Instead of vague questions like “Tell me about TUM,” users are encouraged to ask focused questions such as “What are the English language requirements for the Information Engineering program?” This helps the system retrieve more accurate and relevant information.
 
-#### 2. Use Voice Interaction in Hands-Free or Accessibility Scenarios
+**2. Use Voice Interaction in Hands-Free or Accessibility Scenarios** <br/>
 Leverage the voice-first feature when multitasking, on mobile, or in accessibility-sensitive environments (e.g., visually impaired users), to enjoy a seamless and responsive conversation flow.
 
-#### 3. Review Chat History for Consistency
+**3. Review Chat History for Consistency** <br/>
 Users can revisit past questions using the persistent chat history. This prevents repeated queries, and helps track prior responses for cross-referencing.
 
-#### 4. Escalate via Email Agent When Needed
+**4. Escalate via Email Agent When Needed** <br/>
 If the system cannot answer a complex or administrative-specific question (e.g., “How to submit a late transcript due to visa delay?”), users should make use of the built-in email agent to connect directly with TUM staff. The system will generate a professional draft that can be sent with just a few edits.
 
-#### 5. Provide Feedback for Continuous Improvement
+**5. Provide Feedback for Continuous Improvement** <br/>
 When users find outdated, unclear, or missing information, submitting brief feedback allows our development team to refine retrieval quality and update the FAQ system for future users.
 
 
-### <span id="design-principles--architectural-overview" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">4.2 Common Issues & Solutions</span>
+### <span id="common-issues--solutions" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">4.2 Common Issues & Solutions</span>
 
 | **Issue**                     | **Recommended Solution**                                                                                                                              |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **No Voice Response**         | Clear your browser cache and reopen the app. This resolves most temporary glitches.                                                                   |
 | **Fails to Connect**          | Switch to a different network or check your firewall settings. University or corporate networks (e.g., *eduroam*) may block required API connections. |
-| **Email Agent Not Triggered** | Ensure the input contains **only** a properly formatted email address — no extra characters, spaces, or messages.                                     |
+| **Email Agent Not Triggered&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;** | Ensure the input contains **only** a properly formatted email address — no extra characters, spaces, or messages. |
 
 </div>
