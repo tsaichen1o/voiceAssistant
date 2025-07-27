@@ -48,7 +48,7 @@ input, textarea, select, button {
 </style>
 
 
-<img src="tum_logo.svg" alt="TUM Logo" width="60" align="right">
+<img src="pics/tum_logo.svg" alt="TUM Logo" width="60" align="right">
 
 <div style="font-family: 'Montserrat', sans-serif;">
 
@@ -101,7 +101,7 @@ In the long term, we envision go42TUM as a scalable voice infrastructure that ca
 
 The go42TUM project followed a structured 80-day development cycle from April 30 to July 18, using a waterfall-style Gantt plan to track task dependencies and key stages. The timeline emphasizes a progressive build-up of modular systems—starting from foundational setup to advanced integration and evaluation.
 
-![Gantt Chart Waterfall](gantt_chart_waterfall.svg)
+![Gantt Chart Waterfall](pics/gantt_chart_waterfall.svg)
 
 <div style="page-break-after: always; visibility: hidden"> 
 \pagebreak 
@@ -137,7 +137,7 @@ The following diagram provides a comprehensive overview of the high-level system
 \pagebreak 
 </div>
 
-<img src="architecture_diagram.png" alt="System Architecture Diagram">
+<img src="pics/architecture_diagram.png" alt="System Architecture Diagram">
 <br/>
 
 ### <span id="core-component-deep-dive" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.2 Core Component Deep Dive</span>
@@ -159,10 +159,10 @@ The following diagram provides a comprehensive overview of the high-level system
 
 **3.2.4 Voice Processor**
 
-* **Technology Stack:** Whisper, Coqui TTS, EdgeTTS, SpeechBrain
+* **Technology Stack:** Whisper, Coqui TTS, Edge TTS, SpeechBrain
 * **Responsibilities:** This dedicated microservice handles all speech-related tasks.
   * **ASR (Automatic Speech Recognition, i.e., Speech-to-Text):** We employ OpenAI's **Whisper** model for its robust accuracy across various accents and noisy environments.
-  * **TTS (Text-to-Speech):** To achieve the most natural-sounding voice, we researched and integrated multiple open-source TTS engines, including **Coqui TTS** and **EdgeTTS**, and conducted detailed performance benchmarks.
+  * **TTS (Text-to-Speech):** To achieve the most natural-sounding voice, we researched and integrated multiple open-source TTS engines, including **Coqui TTS** and **Edge TTS**, and conducted detailed performance benchmarks.
 
 **3.2.5 CI/CD & External Services**
 
@@ -231,7 +231,7 @@ Our prompt was evolved through a systematic, test-driven process:
 
 For a voice assistant, low latency and natural-sounding interaction are paramount to the user experience. We therefore employed a systematic methodology to select the optimal voice processing components.
 
-* **Technology Selection:** Our evaluation focused on three open-source configurations to find the optimal voice agent. We created two specialized pipelines by pairing the **Whisper** ASR with two leading TTS engines: **Coqui TTS** and **EdgeTTS**. In parallel, we tested **SpeechBrain** as a self-contained, end-to-end solution, leveraging its native ASR and TTS functionalities.
+* **Technology Selection:** Our evaluation focused on three open-source configurations to find the optimal voice agent. We created two specialized pipelines by pairing the **Whisper** ASR with two leading TTS engines: **Coqui TTS** and **Edge TTS**. In parallel, we tested **SpeechBrain** as a self-contained, end-to-end solution, leveraging its native ASR and TTS functionalities.
 * **Quantitative & Qualitative Assessment:** We utilized the **Analytic Hierarchy Process (AHP)**, a multi-criteria decision analysis method. This approach allowed us to combine **objective metrics** (e.g., end-to-end latency) with **subjective metrics** (e.g., user ratings on voice naturalness from surveys) to scientifically weigh the trade-offs and select the best-performing combination (Whisper + Coqui TTS).
 
 ### <span id="system-validation--verification" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">4.4 System Validation & Verification</span>
@@ -262,7 +262,7 @@ This comprehensive methodology not only guided our development process but also 
 
 We successfully integrated Gemini, via both API and Vertex AI, as the core reasoning engine. A prompt orchestration mechanism was developed to manage contextual interactions and enable coherent multi-turn conversations. Real-time text generation with partial streaming output was implemented to ensure low-latency, responsive user experiences.
 
-A modular speech processing framework was designed using multiple open-source components to support flexible and extensible deployment. The ASR module utilizes Whisper with streaming compatibility, while the TTS pipeline incorporates SpeechBrain, Coqui TTS, and EdgeTTS.
+A modular speech processing framework was designed using multiple open-source components to support flexible and extensible deployment. The ASR module utilizes Whisper with streaming compatibility, while the TTS pipeline incorporates SpeechBrain, Coqui TTS, and Edge TTS.
 
 The system supports both voice and text interactions within a unified session framework, ensuring seamless cross-modal experiences. A basic web interface and a Redis-backed voice agent flow were developed to manage stateful interactions and support scalability.
 
