@@ -1,136 +1,212 @@
-# User Acceptance Testing (UAT)
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
 
-This chapter focuses on a comprehensive evaluation of the user acceptance of our AI voice assistant system. The system is powered by the Gemini large language model and incorporates three speech frameworks—SpeechBrain, Whisper + Coqui TTS, and Whisper + Edge TTS. It supports **English and German** voice input and is designed specifically for international students applying to TUM. To ensure scientific rigor and comprehensiveness, we designed two independent but complementary test branches: one evaluating the Gemini language model via online user feedback, and the other assessing the three speech frameworks through performance video demonstrations and multidimensional scoring analysis.
+* {
+    font-family: 'Montserrat', sans-serif !important;
+}
 
+body, html {
+    font-family: 'Montserrat', sans-serif !important;
+}
 
-# Testing Objective
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Montserrat', sans-serif !important;
+    font-weight: 600;
+}
 
-The main goals of this user acceptance testing are as follows:
+p, span, div, li, td, th, blockquote, pre {
+    font-family: 'Montserrat', sans-serif !important;
+}
 
-- Evaluate Gemini’s language understanding and answer quality in both English and German contexts;
-- Assess the speech recognition accuracy, speech synthesis quality, and response speed of the three speech frameworks in real interaction scenarios;
-- Collect subjective user evaluations regarding overall system interaction experience;
-- Use questionnaires and Analytic Hierarchy Process (AHP) combined with objective performance data to rank the three speech frameworks comprehensively;
-- Verify the system’s adaptability and fault tolerance under the language constraints of supporting only English and German.
+code {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+    color: green;
+    background-color: #f8f9fa;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
 
-# Test Participants and Environment
+a, a:hover, a:visited {
+    font-family: 'Montserrat', sans-serif !important;
+}
 
-- Twelve participants fluent in either English or German, with backgrounds related to applying to German universities, were recruited;
-- Language distribution included 7 fluent English speakers and 5 fluent German speakers;
-- Testing devices included desktop browsers and mobile browsers to ensure cross-platform compatibility;
-- Testing environments included quiet indoor office settings and semi-open spaces such as cafes, simulating realistic usage scenarios;
-- The system only supports English and German voice input; unsupported language inputs trigger friendly system prompts to avoid errors.
+strong, b, em, i {
+    font-family: 'Montserrat', sans-serif !important;
+}
 
+ul, ol, dl {
+    font-family: 'Montserrat', sans-serif !important;
+}
 
-# User Testing Design and Implementation
+table {
+    font-family: 'Montserrat', sans-serif !important;
+}
 
-The user testing was divided into two mutually independent modules to evaluate Gemini’s language model and the three speech frameworks separately.
-
-## Branch A: Gemini Language Model Online Experience and Feedback
-
-### Test Design
-
-- Test users accessed the AI voice assistant platform powered by Gemini via a dedicated link, using real voice interaction to ask various questions related to TUM applications (supporting English and German);
-- Users experienced the speech recognition, language understanding, and answer generation processes in real time;
-- After the session, users completed a structured questionnaire based on a five-point Likert scale rating the following dimensions:
-    - **Answer accuracy**: Whether the answers are correct and factual;
-    - **Clarity of expression**: Whether the answers are fluent and easy to understand;
-    - **Relevance**: Whether the answers address the key points of the questions;
-    - **Practicality**: Whether the answers are helpful for the application process;
-    - **Speech synthesis quality**: Whether the system’s voice replies are natural and fluent.
-
-### Advantages and Significance
-
-- Users can ask free-form questions covering a wide range of realistic scenarios, ensuring representative feedback;
-- Real-time online interaction offers feedback that closely reflects actual user experience.
-
-### Example Test Tasks
-
-- English question example: “What is the application deadline for the TUM winter semester?”
-- German question example: “Welche Dokumente benötigt man für die Bewerbung an der TUM?”
-
-<p align="center">
-<img src="pics/UAT_image1.png" width="50%">
-</p>
+input, textarea, select, button {
+    font-family: 'Montserrat', sans-serif !important;
+}
+</style>
 
 
-### Data Collection
+<img src="pics/tum_logo.svg" alt="TUM Logo" width="60" align="right">
 
-- Aggregate user questionnaire scores and textual feedback;
-- Collect behavioral data such as interaction duration, speech recognition error rate, and retry attempts.z
+<div style="font-family: 'Montserrat', sans-serif;">
 
-## Branch B: Three Speech Frameworks Video Demonstration + Questionnaire Feedback + AHP Multidimensional Evaluation
+# **User Acceptance Testing**
+> A Real-Time Voice AI Consultant for TUM Applicants
 
-### Test Design
+<div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #0e4378; margin: 20px 0;">
+<strong>Group:</strong> 5  <br/>
+<strong>Live Demo:</strong> <a href="https://voice-assistant-gilt.vercel.app/">https://voice-assistant-gilt.vercel.app/</a> <br/>
+<strong>GitHub Repository:</strong> <a href="https://github.com/tsaichen1o/voiceAssistant">https://github.com/tsaichen1o/voiceAssistant</a>
+</div>
 
-- For the three speech frameworks (SpeechBrain, Whisper + Coqui TTS, Whisper + Edge TTS), we produced standardized video demonstrations showcasing each framework’s performance in speech recognition accuracy, speech synthesis naturalness, and response speed;
-- Test users watched the videos and subsequently completed separate questionnaires evaluating each framework’s speech recognition accuracy, speech synthesis naturalness, response speed, and overall user experience;
-- Beyond subjective user ratings, we also incorporated **objective performance metrics** for each framework, mainly:
-    - Speech recognition accuracy (ASR accuracy), based on experimental data statistics;
-    - Response time, i.e., the latency from receiving user speech input to completing answer generation and playback.
+<span style="border-bottom: 1px solid #BDC3C7;display: block;"></span>
 
-<p align="center">
-<img src="pics/UAT_image2.png" width="50%">
-</p>
+1. **[User Case Study](#user-case-study)** <br/>
+    [1.1 Process Overview](#process-overview) <br/>
+    [1.2 Advantages](#advantages) <br/>
+    [1.3 Limitations](#limitations) <br/>
+2. **[UAT Design and Execution](#uat-design-and-execution)** <br/>
+    [2.1 Gemini Evaluation (Live Interaction)](#gemini-evaluation-live-interaction) <br/>
+    [2.2 Speech Framework Evaluation (Video + Questionnaire)](#speech-framework-evaluation-video--questionnaire) <br/>
+3. **[Summary and Insights](#summary-and-insights)** <br/>
+    [3.1 Improvement Suggestions](#improvement-suggestions) <br/>
+    [3.2 Conclusion](#conclusion) <br/>
+**[Appendix](#appendix)** <br/>
+    [Figure A1: Gemini Feedback Bar Plot](#figure-a1-gemini-feedback-bar-plot) <br/>
+    [Figure A2: AHP Result Summary](#figure-a2-ahp-result-summary) <br/>
+
+<span style="border-bottom: 1px solid #BDC3C7;display: block;"></span>
+
+<div style="page-break-after: always; visibility: hidden"> 
+\pagebreak 
+</div>
+
+This report presents a comprehensive evaluation of the user acceptance of our AI voice assistant system. The system is built on the Gemini large language model and integrates three different voice processing frameworks: **SpeechBrain**, **Whisper + Coqui TTS**, and **Whisper + Edge TTS**. It supports **English and German voice input only** and is tailored to assist international students applying to TUM.
+
+To ensure structured and meaningful user engagement, the User Acceptance Testing (UAT) report was split into two complementary streams:
+1. Real-time feedback on Gemini's performance in understanding and answering user queries;
+2. Analytical evaluation of three speech processing frameworks through video demonstrations and multi-dimensional scoring.
+
+---
+
+## <span id="user-case-study" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">1. User Case Study</span>
+
+**Participant Profile**  
+The selected user, **Zhihong Wu**, is a 23-year-old prospective student from China preparing to apply to TUM for a Master’s program in Informatics. He is fluent in English and has intermediate German skills. He represents a typical international applicant who relies on online resources and voice assistants for navigating the complex university application process.
+
+### <span id="process-overview" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">1.1 Process Overview</span>
+
+- Zhihong was first introduced to the purpose of the assistant and received a link to the Gemini-powered voice platform.
+- He used the assistant to ask questions about TUM’s deadlines, required documents, and admission criteria in both English and German.
+- Afterwards, he watched three short demo videos showcasing different speech frameworks (SpeechBrain, Whisper + Coqui, Whisper + Edge) handling the same input query.
+- He completed two separate questionnaires: one for Gemini interaction, and one for speech framework evaluation.
+
+### <span id="advantages" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">1.2 Advantages</span>
+
+- Found the assistant easy to use and fast in processing  
+- The bilingual capability was helpful for trying both English and German  
+- Appreciated the clear pronunciation in the Whisper + Coqui output
+
+### <span id="limitations" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">1.3 Limitations</span>
+
+- Answers were sometimes too short and not sufficiently informative  
+- When trying a few test phrases in Italian, the assistant failed to respond  
+- Long interactions could cause the system to hang
+
+For detailed user feedback metrics, please see [Figure A1: Gemini Feedback Bar Plot](#figure-a1-gemini-feedback-bar-plot) in the Appendix.
 
 
-### AHP Comprehensive Analysis Process
+## <span id="uat-design-and-execution" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">2. UAT Design and Execution</span>
 
-- Construct a multi-level indicator system combining questionnaire ratings and objective performance data;
-- Build pairwise comparison matrices integrating user scores and objective data;
-- Use Analytic Hierarchy Process (AHP) to compute weights of each criterion and composite scores for each framework;
-- Validate consistency indices to ensure scientific reliability of results.
+The UAT plan was designed to evaluate:
 
-# Results Summary and Analysis
+- The effectiveness of Gemini in answering application-related questions  
+- The accuracy and smoothness of speech recognition and synthesis for both English and German  
+- The comparative performance of the three voice processing frameworks  
 
-## **Gemini Language Model**
+### <span id="gemini-evaluation-live-interaction" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">2.1 Gemini Evaluation (Live Interaction)</span> 
 
-- Users showed high subjective satisfaction.
-- Gemini excelled in answer accuracy and practicality, particularly receiving praise for clear answer structure and authoritative information;
-- Users suggested further improving multi-turn dialogue capability and explanations of technical terms.
+Participants were given a web link to interact directly with the AI voice assistant powered by Gemini. They were asked to speak English or German questions related to TUM applications, such as:
 
-<p align="center">
-<img src="pics/UAT_image3.png" width="50%">
-</p>
+- “What is the deadline for TUM master’s application?”  
+- “Welche Unterlagen brauche ich für die Bewerbung?”
+
+After using the system, they filled out an online survey rating:
+
+- Response accuracy  
+- Language understanding  
+- Interaction speed  
+- Overall satisfaction  
+
+**Sample User Feedback (Gemini):**
+-  The answers are generally satisfying  
+-  Recognition is fast and accurate  
+-  Not much information given sometimes  
+-  Doesn’t respond if language is not English or German
+
+### <span id="speech-framework-evaluation-video--questionnaire" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">2.2 Speech Framework Evaluation (Video + Questionnaire)</span>
+
+To ensure consistency in input and eliminate bias caused by live variation, participants were shown pre-recorded videos demonstrating the performance of the three speech frameworks. Each video showed how the same query was processed via:
+
+- **SpeechBrain**  
+- **Whisper + Coqui TTS**  
+- **Whisper + Edge TTS**
+
+Participants completed a detailed questionnaire evaluating each framework based on:
+
+- Voice recognition accuracy  
+- Response latency  
+- Naturalness of synthesized voice  
+- Overall usability  
+
+In addition to subjective ratings, we also included system-measured metrics:
+
+- **ASR word error rate (WER)**  
+- **Average response time per framework**
+
+These subjective and objective factors were combined using the **Analytic Hierarchy Process (AHP)** to compute a final score and ranking. For the complete AHP analysis results, please see [Figure A2: AHP Result Summary](#figure-a2-ahp-result-summary) in the Appendix.
+
+---
+## <span id="summary-and-insights" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">3. Summary and Insights</span>
+
+The UAT revealed several important insights:
+
+- Gemini’s understanding and language handling were rated positively, though users wished for more detailed answers  
+- Speech recognition worked well in both English and German, with minor latency noted in SpeechBrain  
+- Whisper + Coqui TTS ranked highest overall in AHP analysis, balancing speed, clarity, and reliability  
+
+### <span id="improvement-suggestions" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.1 Improvement Suggestions</span>
+
+- Expand the assistant’s answer base for more informative replies  
+- Improve stability during longer sessions  
+- Add prompts or fallback responses when unsupported languages are used  
+- Consider multilingual expansion beyond English and German in future versions  
 
 
-## Comprehensive Evaluation of Three Speech Frameworks
+### <span id="conclusion" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">3.2 Conclusion</span>
+The UAT provided valuable user-centric insights into both the AI and speech components of the system. The testing plan not only validated our core functionalities but also surfaced actionable improvements. It demonstrated that the system is well-received by its target audience and ready for future iteration based on concrete feedback.
 
-| Rank | Speech Framework    | Composite Score (via AHP)     |
-| ---- | ------------------- | ----------------------------- |
-| 1    | Whisper + Coqui TTS | Highest (approx. 0.67)        |
-| 2    | Whisper + Edge TTS  | Second highest (approx. 0.52) |
-| 3    | SpeechBrain         | Lowest (approx. 0.49)         |
+<div style="page-break-after: always; visibility: hidden"> 
+\pagebreak 
+</div>
 
-   
+## <span id="appendix" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #2C3E50; border-bottom: 2px solid #0e4378; padding-bottom: 8px; display: block;">Appendix</span>
 
-<p align="center">
-<img src="pics/UAT_image4.png" width="50%">
-</p>
+### <span id="figure-a1-gemini-feedback-bar-plot" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">Figure A1: Gemini Feedback Bar Plot</span>
 
+<div style="text-align: center;">
+<img src="pics/UAT1.png" alt="Gemini Feedback Bar Plot" style="width: 75%;">
+</div>
 
-- **Whisper + Coqui TTS** achieved the highest composite score (0.67), indicating strong performance across both subjective user feedback and objective evaluation metrics (accuracy and response time). Users particularly appreciated its speech naturalness and reliability.
-- **Whisper + Edge TTS**, with a score of 0.52, ranked second. It showed balanced performance but was slightly less favored than Coqui in terms of voice quality, according to user ratings.
-- **SpeechBrain** scored the lowest at 0.49, mainly due to relatively lower user satisfaction with speech synthesis fluency and higher response latency, despite having decent ASR accuracy.
-- The results demonstrate that **combining subjective (questionnaire-based) and objective (performance-based) criteria via AHP** provides a well-rounded and quantifiable framework for evaluating speech frameworks in real-world applications.
+**Figure A1:** Bar plot visualization showing user feedback ratings for Gemini's performance across different evaluation criteria such as response accuracy and interaction speed.
 
-# User Feedback Summary and Suggestions for Improvement
+### <span id="figure-a2-ahp-result-summary" style="font-family: 'Montserrat', sans-serif; font-weight: 600; color: #34495E; border-bottom: 1px solid #BDC3C7; padding-bottom: 4px; display: block;">Figure A2: AHP Result Summary</span>
 
-- **Positive feedback**:
-    - Generally satisfied with the answers
-    - It’s quite fast
-    - It recognized quite well the voice
-- **Negative feedback**:
-    - Not so much informations
-    - The system cannot understand what I am talking if I talk not in English or German
-    - The system stops responding after a long conversation.
-- **Improvement suggestions**:
-    - Enrich answer content to provide more detailed and informative responses.
-    - Add a friendly reminder or fallback when users speak in unsupported languages (non-English/German).
-    - Improve system robustness during long conversations to prevent freezing or unresponsiveness.
-    - Introduce user customization options such as speech rate and voice clarity settings.
-    - Enhance conversational memory to better handle follow-up questions and maintain context.
+<div style="text-align: center;">
+<img src="pics/UAT2.png" alt="AHP Result Summary" style="width: 75%;">
+</div>
 
-# Summary
-
-This user acceptance testing, through multidimensional evaluation and real user feedback, effectively verified the practical value of the Gemini language model in multilingual speech Q&A. Meanwhile, by integrating subjective questionnaire data with objective performance metrics using AHP, we scientifically revealed the relative performance of the three speech frameworks. The results indicate that Whisper + Edge is the most suitable speech framework for our system’s voice interaction needs. Future versions will focus on further optimizing system stability and user experience based on this foundation.
+**Figure A2:** Comprehensive AHP analysis results showing the final ranking and scoring of the three speech frameworks (SpeechBrain, Whisper + Coqui TTS, and Whisper + Edge TTS) based on combined subjective user ratings and objective performance metrics.
+</div>
